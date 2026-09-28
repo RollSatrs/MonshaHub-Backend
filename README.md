@@ -7,7 +7,7 @@ Backend системы управления общественными баня�
 
 - **NestJS 11** (Express)
 - **Drizzle ORM** + PostgreSQL 16
-- **JWT-авторизация** через httpOnly-cookie `access_token` (`@nestjs/jwt`)
+- **JWT-авторизация** через httpOnly-cookie `monshahub_token` (`shared/constants/auth.ts`) (`@nestjs/jwt`)
 - **class-validator / class-transformer** — валидация DTO (строгий `ValidationPipe`)
 - **@nestjs/throttler** — rate-limiting
 - **@nestjs/swagger** — OpenAPI-контракт для frontend
@@ -59,8 +59,10 @@ pnpm db:seed       # демо-данные (только не в production)
 pnpm start:dev
 ```
 
-Seed создаёт организацию «MonshaHub Demo», владельца `owner@monshahub.demo` и кассира
-`cashier@monshahub.demo` (публичный демо-пароль `demo12345`, только для локальной разработки).
+Seed идемпотентно создаёт организацию «MonshaHub Demo», владельца `owner@monshahub.demo` и кассира
+`cashier@monshahub.demo` (публичный демо-пароль `demo12345`, только для локальной разработки), а также
+каталог: 5 помещений с тарифами (VIP №1–3, Семейный зал — почасовые; Общий мужской зал — вход Adult/Child),
+5 товаров (с начальным остатком в журнале движений) и 2 услуги.
 
 ### 3. Docker
 
@@ -86,6 +88,7 @@ docker compose up --build
 | `pnpm db:seed`         | Demo-данные для разработки                                        |
 | `pnpm db:studio`       | Drizzle Studio                                                    |
 | `pnpm openapi:export`  | Экспортировать OpenAPI-контракт в `openapi.json` (без БД)         |
+| `pnpm openapi:check`   | Проверить, что закоммиченный `openapi.json` актуален (запускается в CI) |
 
 ### Изменения схемы БД
 
@@ -130,6 +133,28 @@ Production-образ не содержит `drizzle-kit`. Миграции пр
 - `pnpm openapi:export` пишет `openapi.json`. Frontend генерирует из него типы (`pnpm api:types`
   в репозитории frontend) — это единственный источник истины по формам запросов/ответов.
 
+### Справочники бани (Phase 1)
+
+| Ресурс | Endpoints | Права |
+| ------ | --------- | ----- |
+| Organization | `GET/PATCH /organization` | чтение — все, PATCH — OWNER (меняется только название) |
+| Rooms | `/rooms` (+ `/:id`) | чтение — все (CASHIER только активные), запись — OWNER |
+| Tariffs | `/tariffs` | то же; `kind` определяет backend по типу помещения |
+| Products | `/products`, `POST/GET /products/:id/stock-movements` | то же; журнал движений — только OWNER |
+| Services | `/services` | то же |
+| Staff | `GET /staff`, `POST /staff/cashiers`, `PATCH /staff/:id` | OWNER; деактивация кассира закрывает доступ сразу |
+
+- **Деньги:** `numeric(12,2)` в БД, в API — decimal-строка (`"10000.00"`); арифметика на backend через `Money`-хелпер
+  (целые minor-единицы, без float). Frontend деньги только форматирует.
+- **Тарифы:** привязаны к помещению. PRIVATE → `HOURLY`, PUBLIC → `PER_ENTRY` + `guestCategory` (`ADULT`/`CHILD`).
+  Не более одного активного тарифа на вид (partial unique index). Правило расчёта часа определится в Phase 2.
+- **Остаток товара** меняется только через `stock-movements` (RESTOCK / WRITE_OFF / ADJUSTMENT; SALE — Phase 2):
+  один условный `UPDATE` + запись журнала в одной транзакции, ниже нуля не уйдёт даже при параллельных запросах.
+- **Жизненный цикл:** основной путь — архивация (`active=false`). `DELETE` — техническая операция только для
+  никогда не использованных записей; иначе `409 ENTITY_IN_USE` (FK на историю — `NO ACTION`).
+- **Tenant isolation:** чужая запись → `404`; тарифы привязываются к помещению композитным FK
+  `(room_id, organization_id)`.
+
 ### Формат ошибок
 
 ```json
@@ -151,7 +176,8 @@ Production-образ не содержит `drizzle-kit`. Миграции пр
 ```
 src/
   auth/       # регистрация (Organization + OWNER), логин, сброс пароля, JwtAuthGuard
-  staff/      # сотрудники организации (создание кассиров, только OWNER)
+  staff/      # сотрудники организации (создание/деактивация кассиров, только OWNER)
+  organization/  rooms/  tariffs/  products/  bath-services/   # справочники бани (Phase 1)
   mail/       # отправка писем
   db/         # схема Drizzle, seed.ts, migrate.ts
   config/     # валидация переменных окружения

@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { AUTH_COOKIE } from '../shared/constants/auth';
 import { eq } from 'drizzle-orm';
 import { db } from '../src';
 import { usersTable } from '../src/db/schema';
@@ -128,8 +129,34 @@ describe('Auth (e2e)', () => {
       .expect(200);
     const cookies = res.headers['set-cookie'] as unknown as string[];
     expect(
-      cookies.some((c) => c.startsWith('access_token=') && /HttpOnly/i.test(c)),
+      cookies.some(
+        (c) => c.startsWith(`${AUTH_COOKIE}=`) && /HttpOnly/i.test(c),
+      ),
     ).toBe(true);
+  });
+
+  it('logout работает без сессии и с недействительным токеном (можно выйти из «застрявшей» сессии) и очищает cookie', async () => {
+    await http().post('/auth/logout').expect(200);
+    const res = await http()
+      .post('/auth/logout')
+      .set('Cookie', `${AUTH_COOKIE}=garbage-token`)
+      .expect(200);
+    const cookies = res.headers['set-cookie'] as unknown as string[];
+    expect(cookies.some((c) => c.startsWith(`${AUTH_COOKIE}=;`))).toBe(true);
+  });
+
+  it('чужая cookie со старым именем access_token игнорируется', async () => {
+    const owner = await registerOwner(app);
+    const login = await http()
+      .post('/auth/login')
+      .send({ email: owner.email, password: PASSWORD })
+      .expect(200);
+    const setCookie = (login.headers['set-cookie'] as unknown as string[])[0];
+    const token = setCookie.split(';')[0].split('=')[1];
+    await http()
+      .get('/auth/me')
+      .set('Cookie', `access_token=${token}`)
+      .expect(401);
   });
 
   it('защищённый эндпоинт без cookie → 401 UNAUTHORIZED', async () => {

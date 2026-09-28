@@ -7,6 +7,7 @@ import {
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import { AUTH_COOKIE } from '../shared/constants/auth';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import { AppException } from './common/errors/app.exception';
 import { ErrorCode } from './common/errors/error-codes';
@@ -52,7 +53,7 @@ export function buildSwaggerDocument(app: INestApplication) {
     .setTitle('MonshaHub API')
     .setDescription('API системы управления общественными банями')
     .setVersion('1.0')
-    .addCookieAuth('access_token')
+    .addCookieAuth(AUTH_COOKIE, undefined, 'access_token')
     .build();
   return SwaggerModule.createDocument(app, config);
 }

@@ -1,14 +1,23 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import {
   ApiCookieAuth,
   ApiCreatedResponse,
   ApiDefaultResponse,
   ApiOkResponse,
+  ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
 import { StaffService } from './staff.service';
 import { CreateCashierDto } from './dto/create-cashier.dto';
-import { UserResponseDto } from 'src/auth/dto/user-response.dto';
+import { StaffMemberResponseDto, UpdateStaffDto } from './dto/staff-member.dto';
 import { CurrentUser, Roles } from 'src/common/decorators/auth.decorators';
 import { ErrorResponseDto } from 'src/common/errors/error-response.dto';
 import type { AuthUser } from 'src/types/express';
@@ -23,7 +32,7 @@ export class StaffController {
 
   @Get()
   @ApiOkResponse({
-    type: [UserResponseDto],
+    type: [StaffMemberResponseDto],
     description: 'Сотрудники своей организации',
   })
   list(@CurrentUser() user: AuthUser) {
@@ -31,8 +40,23 @@ export class StaffController {
   }
 
   @Post('cashiers')
-  @ApiCreatedResponse({ type: UserResponseDto })
+  @ApiCreatedResponse({ type: StaffMemberResponseDto })
   createCashier(@CurrentUser() user: AuthUser, @Body() dto: CreateCashierDto) {
     return this.staffService.createCashier(user.organizationId, dto);
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary: 'Деактивировать / активировать кассира',
+    description:
+      'Деактивированный кассир теряет доступ сразу (действующая сессия перестаёт работать). Себя и владельца изменить нельзя.',
+  })
+  @ApiOkResponse({ type: StaffMemberResponseDto })
+  setActive(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateStaffDto,
+  ) {
+    return this.staffService.setActive(user, id, dto);
   }
 }

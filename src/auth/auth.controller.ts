@@ -19,6 +19,7 @@ import {
   UserResponseDto,
 } from './dto/user-response.dto';
 import { CurrentUser, Public } from 'src/common/decorators/auth.decorators';
+import { AUTH_COOKIE } from 'shared/constants/auth';
 import { ErrorResponseDto } from 'src/common/errors/error-response.dto';
 import type { AuthUser } from 'src/types/express';
 
@@ -47,14 +48,14 @@ export class AuthController {
   @HttpCode(200)
   @ApiOkResponse({
     type: AuthUserResponseDto,
-    description: 'Устанавливает httpOnly cookie access_token',
+    description: 'Устанавливает httpOnly cookie сессии',
   })
   async login(
     @Body() params: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ) {
     const { token, user, message } = await this.authService.login(params);
-    res.cookie('access_token', token, {
+    res.cookie(AUTH_COOKIE, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -70,12 +71,16 @@ export class AuthController {
     return this.authService.getMe(user.id);
   }
 
+  @Public()
   @Post('logout')
   @HttpCode(200)
-  @ApiCookieAuth('access_token')
-  @ApiOkResponse({ type: MessageResponseDto })
+  @ApiOkResponse({
+    type: MessageResponseDto,
+    description:
+      'Идемпотентно очищает cookie сессии (работает и с просроченным/недействительным токеном — иначе клиент не смог бы выйти из «застрявшей» сессии)',
+  })
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('access_token', {
+    res.clearCookie(AUTH_COOKIE, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

@@ -72,7 +72,7 @@
         },
         "responses": {
           "200": {
-            "description": "Устанавливает httpOnly cookie access_token",
+            "description": "Устанавливает httpOnly cookie сессии",
             "content": {
               "application/json": {
                 "schema": {
@@ -139,7 +139,7 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "",
+            "description": "Идемпотентно очищает cookie сессии (работает и с просроченным/недействительным токеном — иначе клиент не смог бы выйти из «застрявшей» сессии)",
             "content": {
               "application/json": {
                 "schema": {
@@ -159,11 +159,6 @@
             }
           }
         },
-        "security": [
-          {
-            "access_token": []
-          }
-        ],
         "tags": [
           "auth"
         ]
@@ -263,7 +258,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/UserResponseDto"
+                    "$ref": "#/components/schemas/StaffMemberResponseDto"
                   }
                 }
               }
@@ -310,7 +305,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/UserResponseDto"
+                  "$ref": "#/components/schemas/StaffMemberResponseDto"
                 }
               }
             }
@@ -335,6 +330,1153 @@
           "staff"
         ]
       }
+    },
+    "/staff/{id}": {
+      "patch": {
+        "description": "Деактивированный кассир теряет доступ сразу (действующая сессия перестаёт работать). Себя и владельца изменить нельзя.",
+        "operationId": "StaffController_setActive",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStaffDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffMemberResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Деактивировать / активировать кассира",
+        "tags": [
+          "staff"
+        ]
+      }
+    },
+    "/organization": {
+      "get": {
+        "operationId": "OrganizationController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Своя организация",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "tags": [
+          "organization"
+        ]
+      },
+      "patch": {
+        "operationId": "OrganizationController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateOrganizationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "tags": [
+          "organization"
+        ]
+      }
+    },
+    "/rooms": {
+      "get": {
+        "operationId": "RoomsController_list",
+        "parameters": [
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Включить архивные записи. Только для OWNER; для CASHIER параметр игнорируется (всегда только активные).",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoomResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Помещения (CASHIER — только активные) с активными тарифами",
+        "tags": [
+          "rooms"
+        ]
+      },
+      "post": {
+        "operationId": "RoomsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoomDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "tags": [
+          "rooms"
+        ]
+      }
+    },
+    "/rooms/{id}": {
+      "get": {
+        "operationId": "RoomsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "tags": [
+          "rooms"
+        ]
+      },
+      "patch": {
+        "description": "Тип помещения изменить нельзя.",
+        "operationId": "RoomsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRoomDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoomResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Изменить помещение / архивировать (active=false)",
+        "tags": [
+          "rooms"
+        ]
+      },
+      "delete": {
+        "description": "Только для помещения, которое никогда не использовалось. Иначе 409 ENTITY_IN_USE — архивируйте (PATCH active=false).",
+        "operationId": "RoomsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Удалить помещение (техническая операция)",
+        "tags": [
+          "rooms"
+        ]
+      }
+    },
+    "/tariffs": {
+      "get": {
+        "operationId": "TariffsController_list",
+        "parameters": [
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Включить архивные записи. Только для OWNER; для CASHIER параметр игнорируется (всегда только активные).",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "roomId",
+            "required": false,
+            "in": "query",
+            "description": "Только тарифы этого помещения",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TariffResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Тарифы (CASHIER — только активные)",
+        "tags": [
+          "tariffs"
+        ]
+      },
+      "post": {
+        "description": "kind определяется по типу помещения. PRIVATE → HOURLY (без guestCategory); PUBLIC → PER_ENTRY (guestCategory обязателен). Не более одного активного тарифа на вид.",
+        "operationId": "TariffsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTariffDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TariffResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Создать тариф помещения",
+        "tags": [
+          "tariffs"
+        ]
+      }
+    },
+    "/tariffs/{id}": {
+      "patch": {
+        "description": "Смена цены не влияет на уже начатые посещения (Visit хранит snapshot тарифа).",
+        "operationId": "TariffsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTariffDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TariffResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Изменить тариф / архивировать (active=false)",
+        "tags": [
+          "tariffs"
+        ]
+      },
+      "delete": {
+        "description": "Только для тарифа, который никогда не использовался. Иначе 409 ENTITY_IN_USE — архивируйте (PATCH active=false).",
+        "operationId": "TariffsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Удалить тариф (техническая операция)",
+        "tags": [
+          "tariffs"
+        ]
+      }
+    },
+    "/products": {
+      "get": {
+        "operationId": "ProductsController_list",
+        "parameters": [
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Включить архивные записи. Только для OWNER; для CASHIER параметр игнорируется (всегда только активные).",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProductResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Товары (CASHIER — только активные)",
+        "tags": [
+          "products"
+        ]
+      },
+      "post": {
+        "operationId": "ProductsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/products/{id}": {
+      "get": {
+        "operationId": "ProductsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "tags": [
+          "products"
+        ]
+      },
+      "patch": {
+        "description": "Остаток здесь не меняется — используйте POST /products/:id/stock-movements.",
+        "operationId": "ProductsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Изменить товар / архивировать (active=false)",
+        "tags": [
+          "products"
+        ]
+      },
+      "delete": {
+        "description": "Только для товара без истории движений и продаж. Иначе 409 ENTITY_IN_USE — архивируйте (PATCH active=false).",
+        "operationId": "ProductsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Удалить товар (техническая операция)",
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/products/{id}/stock-movements": {
+      "post": {
+        "description": "RESTOCK (+), WRITE_OFF (−, нужна причина), ADJUSTMENT (±, нужна причина). Остаток и запись журнала меняются атомарно; ниже нуля остаток не уйдёт (409 INSUFFICIENT_STOCK).",
+        "operationId": "ProductsController_addMovement",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStockMovementDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockMovementResultDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Ручное движение остатка",
+        "tags": [
+          "products"
+        ]
+      },
+      "get": {
+        "operationId": "ProductsController_listMovements",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StockMovementResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Журнал движений товара (новые сверху)",
+        "tags": [
+          "products"
+        ]
+      }
+    },
+    "/services": {
+      "get": {
+        "operationId": "BathServicesController_list",
+        "parameters": [
+          {
+            "name": "includeInactive",
+            "required": false,
+            "in": "query",
+            "description": "Включить архивные записи. Только для OWNER; для CASHIER параметр игнорируется (всегда только активные).",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BathServiceResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Услуги (CASHIER — только активные)",
+        "tags": [
+          "services"
+        ]
+      },
+      "post": {
+        "operationId": "BathServicesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBathServiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BathServiceResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "tags": [
+          "services"
+        ]
+      }
+    },
+    "/services/{id}": {
+      "get": {
+        "operationId": "BathServicesController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BathServiceResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "tags": [
+          "services"
+        ]
+      },
+      "patch": {
+        "operationId": "BathServicesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBathServiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BathServiceResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Изменить услугу / архивировать (active=false)",
+        "tags": [
+          "services"
+        ]
+      },
+      "delete": {
+        "description": "Только для услуги, которая никогда не использовалась. Иначе 409 ENTITY_IN_USE — архивируйте (PATCH active=false).",
+        "operationId": "BathServicesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Удалить услугу (техническая операция)",
+        "tags": [
+          "services"
+        ]
+      }
     }
   },
   "info": {
@@ -347,10 +1489,10 @@
   "servers": [],
   "components": {
     "securitySchemes": {
-      "cookie": {
+      "access_token": {
         "type": "apiKey",
         "in": "cookie",
-        "name": "access_token"
+        "name": "monshahub_token"
       }
     },
     "schemas": {
@@ -374,6 +1516,11 @@
               "INVALID_CREDENTIALS",
               "EMAIL_ALREADY_EXISTS",
               "INVALID_RESET_TOKEN",
+              "DUPLICATE_NAME",
+              "ENTITY_IN_USE",
+              "TARIFF_ALREADY_EXISTS",
+              "TARIFF_ROOM_TYPE_MISMATCH",
+              "CANNOT_DEACTIVATE_SELF",
               "ROOM_NOT_AVAILABLE",
               "BOOKING_CONFLICT",
               "INSUFFICIENT_STOCK",
@@ -547,6 +1694,51 @@
           "password"
         ]
       },
+      "StaffMemberResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "example": 1
+          },
+          "organizationId": {
+            "type": "number",
+            "example": 1
+          },
+          "fullname": {
+            "type": "string",
+            "example": "Иван Иванов"
+          },
+          "email": {
+            "type": "string",
+            "example": "owner@example.com"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "OWNER",
+              "CASHIER"
+            ]
+          },
+          "avatar": {
+            "type": "string",
+            "nullable": true
+          },
+          "active": {
+            "type": "boolean",
+            "description": "false — сотрудник деактивирован и не может войти"
+          }
+        },
+        "required": [
+          "id",
+          "organizationId",
+          "fullname",
+          "email",
+          "role",
+          "avatar",
+          "active"
+        ]
+      },
       "CreateCashierDto": {
         "type": "object",
         "properties": {
@@ -568,6 +1760,507 @@
           "email",
           "password"
         ]
+      },
+      "UpdateStaffDto": {
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean",
+            "description": "false — деактивировать кассира (доступ закрывается сразу), true — вернуть доступ"
+          }
+        },
+        "required": [
+          "active"
+        ]
+      },
+      "OrganizationResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "Баня «Парная»"
+          },
+          "currency": {
+            "type": "string",
+            "example": "KZT",
+            "description": "Валюта организации (пока не изменяется)"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Asia/Almaty",
+            "description": "Часовой пояс (пока не изменяется)"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "currency",
+          "timezone"
+        ]
+      },
+      "UpdateOrganizationDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Баня «Парная»"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "TariffResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "example": 1
+          },
+          "roomId": {
+            "type": "number",
+            "example": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "HOURLY",
+              "PER_ENTRY"
+            ],
+            "description": "Определяется backend по типу помещения: PRIVATE → HOURLY, PUBLIC → PER_ENTRY"
+          },
+          "guestCategory": {
+            "type": "string",
+            "enum": [
+              "ADULT",
+              "CHILD"
+            ],
+            "nullable": true,
+            "description": "Только для PER_ENTRY"
+          },
+          "name": {
+            "type": "string",
+            "example": "Почасовой"
+          },
+          "price": {
+            "type": "string",
+            "example": "10000.00",
+            "description": "Цена часа (HOURLY) или одного входа (PER_ENTRY), decimal-строка"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "roomId",
+          "kind",
+          "guestCategory",
+          "name",
+          "price",
+          "active"
+        ]
+      },
+      "RoomResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "VIP №1"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "PRIVATE",
+              "PUBLIC"
+            ],
+            "description": "PRIVATE — арендует клиент/группа; PUBLIC — общественный зал. Не меняется после создания."
+          },
+          "capacity": {
+            "type": "number",
+            "example": 6
+          },
+          "sortOrder": {
+            "type": "number",
+            "example": 0,
+            "description": "Порядок отображения (меньше — раньше)"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "false — помещение в архиве"
+          },
+          "activeTariffs": {
+            "description": "Активные тарифы помещения (собраны на backend)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TariffResponseDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "capacity",
+          "sortOrder",
+          "active",
+          "activeTariffs"
+        ]
+      },
+      "CreateRoomDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "VIP №1",
+            "maxLength": 255
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "PRIVATE",
+              "PUBLIC"
+            ]
+          },
+          "capacity": {
+            "type": "number",
+            "example": 6,
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "sortOrder": {
+            "type": "number",
+            "example": 0,
+            "default": 0
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "capacity"
+        ]
+      },
+      "UpdateRoomDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "capacity": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "sortOrder": {
+            "type": "number"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "false — архивировать помещение"
+          }
+        }
+      },
+      "CreateTariffDto": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "number",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "Почасовой",
+            "maxLength": 255
+          },
+          "guestCategory": {
+            "type": "string",
+            "enum": [
+              "ADULT",
+              "CHILD"
+            ],
+            "description": "Обязательно для PUBLIC-помещения, запрещено для PRIVATE"
+          },
+          "price": {
+            "type": "string",
+            "example": "10000.00",
+            "pattern": "^\\d{1,10}(\\.\\d{1,2})?$",
+            "description": "Decimal-строка, до 2 знаков после точки"
+          }
+        },
+        "required": [
+          "roomId",
+          "name",
+          "price"
+        ]
+      },
+      "UpdateTariffDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "price": {
+            "type": "string",
+            "example": "10000.00",
+            "pattern": "^\\d{1,10}(\\.\\d{1,2})?$",
+            "description": "Decimal-строка, до 2 знаков после точки"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "false — архивировать тариф"
+          }
+        }
+      },
+      "ProductResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "Веник"
+          },
+          "price": {
+            "type": "string",
+            "example": "2500.00"
+          },
+          "stock": {
+            "type": "number",
+            "example": 50,
+            "description": "Текущий остаток. Меняется только через stock-movements."
+          },
+          "active": {
+            "type": "boolean",
+            "description": "false — товар в архиве (не продаётся, история сохраняется)"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "price",
+          "stock",
+          "active"
+        ]
+      },
+      "CreateProductDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Веник",
+            "maxLength": 255
+          },
+          "price": {
+            "type": "string",
+            "example": "10000.00",
+            "pattern": "^\\d{1,10}(\\.\\d{1,2})?$",
+            "description": "Decimal-строка, до 2 знаков после точки"
+          },
+          "stock": {
+            "type": "number",
+            "example": 50,
+            "default": 0,
+            "description": "Начальный остаток; при > 0 создаётся движение RESTOCK"
+          }
+        },
+        "required": [
+          "name",
+          "price"
+        ]
+      },
+      "UpdateProductDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "price": {
+            "type": "string",
+            "example": "10000.00",
+            "pattern": "^\\d{1,10}(\\.\\d{1,2})?$",
+            "description": "Decimal-строка, до 2 знаков после точки"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "false — архивировать товар"
+          }
+        }
+      },
+      "CreateStockMovementDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "RESTOCK",
+              "WRITE_OFF",
+              "ADJUSTMENT"
+            ],
+            "description": "SALE создаётся автоматически при добавлении товара в посещение (Phase 2)"
+          },
+          "quantityDelta": {
+            "type": "number",
+            "example": 20,
+            "description": "Изменение остатка со знаком. RESTOCK > 0, WRITE_OFF < 0, ADJUSTMENT — любое ≠ 0."
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Обязательна для WRITE_OFF и ADJUSTMENT"
+          }
+        },
+        "required": [
+          "type",
+          "quantityDelta"
+        ]
+      },
+      "StockMovementResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "productId": {
+            "type": "number"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "RESTOCK",
+              "WRITE_OFF",
+              "ADJUSTMENT",
+              "SALE"
+            ]
+          },
+          "quantityDelta": {
+            "type": "number",
+            "example": 20
+          },
+          "balanceAfter": {
+            "type": "number",
+            "example": 70,
+            "description": "Остаток после операции"
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdBy": {
+            "type": "number"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "productId",
+          "type",
+          "quantityDelta",
+          "balanceAfter",
+          "reason",
+          "createdBy",
+          "createdByName",
+          "createdAt"
+        ]
+      },
+      "StockMovementResultDto": {
+        "type": "object",
+        "properties": {
+          "movement": {
+            "$ref": "#/components/schemas/StockMovementResponseDto"
+          },
+          "product": {
+            "$ref": "#/components/schemas/ProductResponseDto"
+          }
+        },
+        "required": [
+          "movement",
+          "product"
+        ]
+      },
+      "BathServiceResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number",
+            "example": 1
+          },
+          "name": {
+            "type": "string",
+            "example": "Массаж"
+          },
+          "price": {
+            "type": "string",
+            "example": "5000.00"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "false — услуга в архиве"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "price",
+          "active"
+        ]
+      },
+      "CreateBathServiceDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Массаж",
+            "maxLength": 255
+          },
+          "price": {
+            "type": "string",
+            "example": "10000.00",
+            "pattern": "^\\d{1,10}(\\.\\d{1,2})?$",
+            "description": "Decimal-строка, до 2 знаков после точки"
+          }
+        },
+        "required": [
+          "name",
+          "price"
+        ]
+      },
+      "UpdateBathServiceDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "price": {
+            "type": "string",
+            "example": "10000.00",
+            "pattern": "^\\d{1,10}(\\.\\d{1,2})?$",
+            "description": "Decimal-строка, до 2 знаков после точки"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "false — архивировать услугу"
+          }
+        }
       }
     }
   }

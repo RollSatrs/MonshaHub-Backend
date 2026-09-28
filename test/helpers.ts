@@ -26,6 +26,8 @@ export async function createApp(): Promise<INestApplication> {
   const app = moduleRef.createNestApplication();
   configureApp(app);
   await app.init();
+  // постоянный эфемерный порт: параллельные запросы supertest не пересоздают listen
+  await app.listen(0);
   return app;
 }
 
@@ -94,4 +96,80 @@ export async function cleanup() {
 /** Закрывает пул соединений, чтобы Jest завершался без --forceExit. */
 export async function closeDb() {
   await db.$client.end();
+}
+
+// ─── Phase 1: справочники ─────────────────────────────────────────────────
+
+export type Agent = ReturnType<typeof request.agent>;
+
+let nameCounter = 0;
+export function uniqueName(prefix: string) {
+  nameCounter += 1;
+  return `${prefix} ${Date.now()}-${nameCounter}`;
+}
+
+export interface RoomBody {
+  id: number;
+  name: string;
+  type: 'PRIVATE' | 'PUBLIC';
+  capacity: number;
+  sortOrder: number;
+  active: boolean;
+  activeTariffs: TariffBody[];
+}
+
+export interface TariffBody {
+  id: number;
+  roomId: number;
+  kind: 'HOURLY' | 'PER_ENTRY';
+  guestCategory: 'ADULT' | 'CHILD' | null;
+  name: string;
+  price: string;
+  active: boolean;
+}
+
+export interface ProductBody {
+  id: number;
+  name: string;
+  price: string;
+  stock: number;
+  active: boolean;
+}
+
+export interface ErrorBody {
+  statusCode: number;
+  code: string;
+  message: string;
+  details?: string[];
+}
+
+export async function mkRoom(agent: Agent, over: Record<string, unknown> = {}) {
+  const res = await agent
+    .post('/rooms')
+    .send({ name: uniqueName('Room'), type: 'PRIVATE', capacity: 6, ...over })
+    .expect(201);
+  return res.body as RoomBody;
+}
+
+export async function mkTariff(
+  agent: Agent,
+  roomId: number,
+  over: Record<string, unknown> = {},
+) {
+  const res = await agent
+    .post('/tariffs')
+    .send({ roomId, name: 'Почасовой', price: '10000', ...over })
+    .expect(201);
+  return res.body as TariffBody;
+}
+
+export async function mkProduct(
+  agent: Agent,
+  over: Record<string, unknown> = {},
+) {
+  const res = await agent
+    .post('/products')
+    .send({ name: uniqueName('Product'), price: '2500', stock: 0, ...over })
+    .expect(201);
+  return res.body as ProductBody;
 }
