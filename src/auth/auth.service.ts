@@ -1,21 +1,37 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { RegisterDto } from './dto/register.dto';
-import { db } from 'src';
-import { passwordResetTokensTable, usersTable } from 'src/db/schema';
-import { eq } from 'drizzle-orm';
-import { hashFunction, unHashFunction } from 'shared/tools/tools';
-import { LoginDto } from './dto/login.dto';
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { and, eq } from 'drizzle-orm';
 import { JwtService } from '@nestjs/jwt';
+import * as crypto from 'crypto';
+import { db } from 'src';
+import {
+  organizationsTable,
+  passwordResetTokensTable,
+  usersTable,
+} from 'src/db/schema';
+import { hashFunction, unHashFunction } from 'shared/tools/tools';
 import { MailService } from 'src/mail/mail.service';
+import { AppException } from 'src/common/errors/app.exception';
+import { ErrorCode } from 'src/common/errors/error-codes';
+import type { AuthUser } from 'src/types/express';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import * as crypto from 'crypto';
+import { toUserResponse } from './dto/user-response.dto';
+
+const INVALID_CREDENTIALS = () =>
+  new AppException(
+    ErrorCode.INVALID_CREDENTIALS,
+    'Неверный email или пароль',
+    HttpStatus.UNAUTHORIZED,
+  );
+
+const INVALID_RESET_TOKEN = (message: string) =>
+  new AppException(
+    ErrorCode.INVALID_RESET_TOKEN,
+    message,
+    HttpStatus.BAD_REQUEST,
+  );
 
 @Injectable()
 export class AuthService {
@@ -24,60 +40,75 @@ export class AuthService {
     private readonly mailService: MailService,
   ) {}
 
+  /** Создаёт организацию и её владельца (OWNER) в одной транзакции. */
   async register(dto: RegisterDto) {
-    const user = await db
-      .select()
+    const email = dto.email.trim().toLowerCase();
+    const [existing] = await db
+      .select({ id: usersTable.id })
       .from(usersTable)
-      .where(eq(usersTable.email, dto.email))
+      .where(eq(usersTable.email, email))
       .limit(1);
-    if (user.length)
-      throw new ConflictException('Пользователь с таким email уже существует');
-    const hashPassowrd = await hashFunction(dto.password);
-    const newUser = await db
-      .insert(usersTable)
-      .values({
-        fullname: dto.fullname,
-        email: dto.email,
-        passwordHash: hashPassowrd,
-        role: dto.role,
-      })
-      .returning();
-    return { message: 'Регистрация прошла успешно', user: newUser };
+    if (existing) throw this.emailTaken();
+
+    const passwordHash = await hashFunction(dto.password);
+
+    try {
+      const user = await db.transaction(async (tx) => {
+        const [org] = await tx
+          .insert(organizationsTable)
+          .values({ name: dto.organizationName.trim() })
+          .returning();
+        const [created] = await tx
+          .insert(usersTable)
+          .values({
+            organizationId: org.id,
+            fullname: dto.fullname.trim(),
+            email,
+            passwordHash,
+            role: 'OWNER',
+          })
+          .returning();
+        return created;
+      });
+      return {
+        message: 'Регистрация прошла успешно',
+        user: toUserResponse(user),
+      };
+    } catch (err) {
+      // гонка: параллельная регистрация с тем же email (unique violation)
+      if ((err as { cause?: { code?: string } })?.cause?.code === '23505') {
+        throw this.emailTaken();
+      }
+      throw err;
+    }
   }
 
   async login(dto: LoginDto) {
-    const user = await db
+    const [user] = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.email, dto.email))
+      .where(eq(usersTable.email, dto.email.trim().toLowerCase()))
       .limit(1);
 
-    if (!user.length)
-      throw new UnauthorizedException('Неверный email или пароль');
-
+    // одинаковая ошибка для «нет пользователя» / «неверный пароль» / «неактивен»
+    if (!user || !user.active) throw INVALID_CREDENTIALS();
     const isPasswordValid = await unHashFunction(
       dto.password,
-      user[0].passwordHash,
+      user.passwordHash,
     );
-    if (!isPasswordValid) throw new UnauthorizedException('Неверный пароль');
+    if (!isPasswordValid) throw INVALID_CREDENTIALS();
 
-    const payload = {
-      id: user[0].id,
-      email: user[0].email,
-      role: user[0].role,
+    const payload: AuthUser = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      organizationId: user.organizationId,
     };
-
-    const token = this.jwtService.sign(payload);
 
     return {
       message: 'Успешный вход',
-      user: {
-        id: user[0].id,
-        fullname: user[0].fullname,
-        email: user[0].email,
-        role: user[0].role,
-      },
-      token,
+      user: toUserResponse(user),
+      token: this.jwtService.sign(payload),
     };
   }
 
@@ -87,36 +118,37 @@ export class AuthService {
       .from(usersTable)
       .where(eq(usersTable.id, id))
       .limit(1);
-
-    return {
-      id: user.id,
-      fullname: user.fullname,
-      email: user.email,
-      role: user.role,
-      avatar: user.avatar,
-    };
+    if (!user || !user.active) {
+      throw new AppException(
+        ErrorCode.UNAUTHORIZED,
+        'Пользователь не найден',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+    return toUserResponse(user);
   }
 
+  /** Всегда отвечает одинаково — не раскрывает, зарегистрирован ли email. */
   async forgotPassword(dto: ForgotPasswordDto) {
     const [user] = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.email, dto.email))
+      .where(
+        and(
+          eq(usersTable.email, dto.email.trim().toLowerCase()),
+          eq(usersTable.active, true),
+        ),
+      )
       .limit(1);
 
-    if (!user)
-      throw new NotFoundException('Пользователь с таким email не найден');
-
-    const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 час
-
-    await db.insert(passwordResetTokensTable).values({
-      userId: user.id,
-      token,
-      expiresAt,
-    });
-
-    await this.mailService.sendPasswordReset(user.email, token);
+    if (user) {
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 час
+      await db
+        .insert(passwordResetTokensTable)
+        .values({ userId: user.id, token, expiresAt });
+      await this.mailService.sendPasswordReset(user.email, token);
+    }
 
     return { message: 'Если email зарегистрирован, вы получите письмо' };
   }
@@ -128,25 +160,33 @@ export class AuthService {
       .where(eq(passwordResetTokensTable.token, dto.token))
       .limit(1);
 
-    if (!resetToken)
-      throw new BadRequestException('Неверная или истёкшая ссылка');
+    if (!resetToken) throw INVALID_RESET_TOKEN('Неверная или истёкшая ссылка');
     if (resetToken.used)
-      throw new BadRequestException('Ссылка уже была использована');
+      throw INVALID_RESET_TOKEN('Ссылка уже была использована');
     if (resetToken.expiresAt < new Date())
-      throw new BadRequestException('Ссылка истекла');
+      throw INVALID_RESET_TOKEN('Ссылка истекла');
 
     const newHash = await hashFunction(dto.password);
 
-    await db
-      .update(usersTable)
-      .set({ passwordHash: newHash })
-      .where(eq(usersTable.id, resetToken.userId));
-
-    await db
-      .update(passwordResetTokensTable)
-      .set({ used: true })
-      .where(eq(passwordResetTokensTable.id, resetToken.id));
+    await db.transaction(async (tx) => {
+      await tx
+        .update(usersTable)
+        .set({ passwordHash: newHash })
+        .where(eq(usersTable.id, resetToken.userId));
+      await tx
+        .update(passwordResetTokensTable)
+        .set({ used: true })
+        .where(eq(passwordResetTokensTable.id, resetToken.id));
+    });
 
     return { message: 'Пароль успешно изменён' };
+  }
+
+  private emailTaken() {
+    return new AppException(
+      ErrorCode.EMAIL_ALREADY_EXISTS,
+      'Пользователь с таким email уже существует',
+      HttpStatus.CONFLICT,
+    );
   }
 }

@@ -1,7 +1,8 @@
-import { UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import { MailService } from 'src/mail/mail.service';
+import { AppException } from 'src/common/errors/app.exception';
+import { ErrorCode } from 'src/common/errors/error-codes';
 
 const selectMock = {
   from: jest.fn().mockReturnThis(),
@@ -13,6 +14,7 @@ jest.mock('src', () => ({
   db: {
     select: jest.fn(() => selectMock),
     insert: jest.fn(),
+    transaction: jest.fn(),
   },
 }));
 
@@ -22,6 +24,17 @@ jest.mock('shared/tools/tools', () => ({
     (password: string, hash: string) => hash === `hashed:${password}`,
   ),
 }));
+
+const baseUser = {
+  id: 1,
+  organizationId: 7,
+  fullname: 'Test User',
+  email: 'user@test.com',
+  passwordHash: 'hashed:correct-password',
+  role: 'OWNER',
+  avatar: null,
+  active: true,
+};
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -36,67 +49,59 @@ describe('AuthService', () => {
   });
 
   describe('login', () => {
-    it('бросает UnauthorizedException, если пользователь не найден', async () => {
+    it('INVALID_CREDENTIALS, если пользователь не найден', async () => {
       selectMock.limit.mockResolvedValueOnce([]);
-
       await expect(
         service.login({ email: 'unknown@test.com', password: 'password123' }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
+      ).rejects.toMatchObject({ code: ErrorCode.INVALID_CREDENTIALS });
     });
 
-    it('бросает UnauthorizedException при неверном пароле', async () => {
-      selectMock.limit.mockResolvedValueOnce([
-        {
-          id: 1,
-          email: 'user@test.com',
-          passwordHash: 'hashed:correct',
-          role: 'student',
-        },
-      ]);
+    it('INVALID_CREDENTIALS при неверном пароле (то же сообщение)', async () => {
+      selectMock.limit.mockResolvedValueOnce([baseUser]);
+      const err = await service
+        .login({ email: 'user@test.com', password: 'wrong-password' })
+        .catch((e: AppException) => e);
+      expect(err).toMatchObject({ code: ErrorCode.INVALID_CREDENTIALS });
+      expect((err as AppException).message).toBe('Неверный email или пароль');
+    });
 
+    it('INVALID_CREDENTIALS для неактивного пользователя', async () => {
+      selectMock.limit.mockResolvedValueOnce([{ ...baseUser, active: false }]);
       await expect(
-        service.login({ email: 'user@test.com', password: 'wrong-password' }),
-      ).rejects.toBeInstanceOf(UnauthorizedException);
+        service.login({ email: 'user@test.com', password: 'correct-password' }),
+      ).rejects.toMatchObject({ code: ErrorCode.INVALID_CREDENTIALS });
     });
 
-    it('возвращает токен и данные пользователя при верных данных', async () => {
-      selectMock.limit.mockResolvedValueOnce([
-        {
-          id: 1,
-          fullname: 'Test User',
-          email: 'user@test.com',
-          passwordHash: 'hashed:correct-password',
-          role: 'student',
-        },
-      ]);
-
+    it('возвращает токен с organizationId и user без passwordHash', async () => {
+      selectMock.limit.mockResolvedValueOnce([baseUser]);
       const result = await service.login({
         email: 'user@test.com',
         password: 'correct-password',
       });
 
       expect(result.token).toBe('signed.jwt.token');
-      expect(result.user).toMatchObject({ id: 1, email: 'user@test.com' });
+      expect(result.user).toMatchObject({ id: 1, organizationId: 7 });
+      expect(JSON.stringify(result.user)).not.toMatch(/password/i);
       expect(signMock).toHaveBeenCalledWith({
         id: 1,
         email: 'user@test.com',
-        role: 'student',
+        role: 'OWNER',
+        organizationId: 7,
       });
     });
   });
 
   describe('register', () => {
-    it('бросает ConflictException, если email уже занят', async () => {
+    it('EMAIL_ALREADY_EXISTS, если email уже занят', async () => {
       selectMock.limit.mockResolvedValueOnce([{ id: 1 }]);
-
       await expect(
         service.register({
+          organizationName: 'Org',
           fullname: 'Test',
           email: 'taken@test.com',
           password: 'password123',
-          role: 'student',
         }),
-      ).rejects.toBeInstanceOf(ConflictException);
+      ).rejects.toMatchObject({ code: ErrorCode.EMAIL_ALREADY_EXISTS });
     });
   });
 });

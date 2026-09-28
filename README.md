@@ -1,103 +1,180 @@
-# Backend Template
+# MonshaHub Backend
 
-Стартовый шаблон бэкенда на [NestJS](https://nestjs.com) с авторизацией, Postgres/Drizzle ORM,
-почтой и заготовкой под AI (OpenAI). Используется как база для новых проектов.
+Backend системы управления общественными банями и банными комплексами.
+Центр продукта — реальная работа бани во время посещения клиента (`Visit`).
 
 ## Стек
 
 - **NestJS 11** (Express)
-- **Drizzle ORM** + PostgreSQL
-- **JWT-авторизация** через httpOnly-cookie (`@nestjs/jwt`)
-- **class-validator / class-transformer** — валидация DTO
+- **Drizzle ORM** + PostgreSQL 16
+- **JWT-авторизация** через httpOnly-cookie `access_token` (`@nestjs/jwt`)
+- **class-validator / class-transformer** — валидация DTO (строгий `ValidationPipe`)
 - **@nestjs/throttler** — rate-limiting
-- **@nestjs/swagger** — автогенерируемая документация API
-- **Nodemailer** — отправка писем (сброс пароля)
-- **OpenAI SDK** — заготовка AI-модуля
+- **@nestjs/swagger** — OpenAPI-контракт для frontend
+- **Nodemailer** — письма (сброс пароля)
+- **Jest** — unit и e2e тесты
+
+## Модель доступа
+
+**Organization** — конкретная баня / банный комплекс. Все бизнес-данные принадлежат организации,
+пользователь одной организации не имеет доступа к данным другой. `organizationId` всегда берётся
+из JWT (`@CurrentUser()`), а не из тела запроса.
+
+| Роль      | Что может                                                                      |
+| --------- | ------------------------------------------------------------------------------ |
+| `OWNER`   | Владелец: полный доступ к своей организации, сотрудники, настройки, аналитика  |
+| `CASHIER` | Касса: работа с посещениями, бронированиями, оплатой                            |
+
+- Публичная регистрация (`POST /auth/register`) создаёт **новую организацию и её OWNER**. Роль выбрать нельзя.
+- Кассиров создаёт OWNER: `POST /staff/cashiers`.
+- Все эндпоинты закрыты по умолчанию (глобальный `JwtAuthGuard`); публичные помечаются `@Public()`.
+  Ограничение по ролям — `@Roles('OWNER')` + глобальный `RolesGuard`.
 
 ## Быстрый старт
 
 ### 1. Переменные окружения
 
-Скопируйте `.env.example` в `.env` и заполните значения:
-
 ```bash
 cp .env.example .env
 ```
 
-| Переменная      | Описание                                              |
-| --------------- | ------------------------------------------------------ |
-| `PORT`          | Порт, на котором слушает сервер (по умолчанию `3001`)  |
-| `DATABASE_URL`  | Строка подключения к PostgreSQL                        |
-| `FRONT_URL`     | URL фронтенда (CORS + ссылки в письмах)                 |
-| `SECRET_KEY`    | Секрет для подписи JWT                                 |
-| `OPENAI_API`    | Ключ OpenAI (опционально, для `/ai`)                    |
-| `SMTP_HOST/PORT/SECURE/USER/PASS/FROM` | Настройки почты для сброса пароля      |
-| `NODE_ENV`      | `development` / `production` / `test`                  |
+| Переменная                             | Описание                                                       |
+| -------------------------------------- | -------------------------------------------------------------- |
+| `PORT`                                 | Порт сервера (по умолчанию `3001`)                             |
+| `DATABASE_URL`                         | Строка подключения к PostgreSQL                                |
+| `FRONT_URL`                            | URL фронтенда (CORS + ссылки в письмах)                        |
+| `SECRET_KEY`                           | Секрет подписи JWT, **минимум 32 символа**                     |
+| `SMTP_HOST/PORT/SECURE/USER/PASS/FROM` | Почта для сброса пароля                                        |
+| `NODE_ENV`                             | `development` / `production` / `test`                          |
+| `TEST_DATABASE_URL`                    | Только для e2e: отдельная БД с применёнными миграциями         |
 
-Переменные валидируются при старте (`src/config/env.validation.ts`) — приложение не запустится
-с некорректным `.env`.
+Переменные валидируются при старте (`src/config/env.validation.ts`).
 
-### 2. Установка и запуск (локально)
+### 2. Локальный запуск
 
 ```bash
 pnpm install
-pnpm db:push       # применить схему к БД (или db:migrate, если используете миграции)
+pnpm db:migrate    # применить миграции
+pnpm db:seed       # демо-данные (только не в production)
 pnpm start:dev
 ```
 
-### 3. Запуск через Docker
+Seed создаёт организацию «MonshaHub Demo», владельца `owner@monshahub.demo` и кассира
+`cashier@monshahub.demo` (публичный демо-пароль `demo12345`, только для локальной разработки).
 
-Поднимает Postgres и бэкенд одной командой:
+### 3. Docker
 
 ```bash
 docker compose up --build
 ```
 
-## Скрипты
+Поднимает Postgres, **применяет миграции** (одноразовый сервис `migrate`) и только после этого запускает backend.
 
-| Команда            | Назначение                                  |
-| ------------------ | -------------------------------------------- |
-| `pnpm start:dev`   | Запуск в watch-режиме                        |
-| `pnpm build`       | Сборка в `dist/`                             |
-| `pnpm start:prod`  | Запуск собранного приложения                 |
-| `pnpm lint`        | ESLint с автофиксом                          |
-| `pnpm test`        | Юнит-тесты (Jest)                            |
-| `pnpm test:e2e`    | E2E-тесты                                    |
-| `pnpm db:generate` | Сгенерировать миграцию из схемы Drizzle      |
-| `pnpm db:migrate`  | Применить миграции                           |
-| `pnpm db:push`     | Синхронизировать схему с БД напрямую (dev)   |
-| `pnpm db:studio`   | Drizzle Studio — просмотр БД в браузере      |
+## Команды
 
-## API-документация
+| Команда                | Назначение                                                        |
+| ---------------------- | ----------------------------------------------------------------- |
+| `pnpm start:dev`       | Запуск в watch-режиме                                             |
+| `pnpm build`           | Сборка в `dist/`                                                  |
+| `pnpm start:prod`      | Запуск собранного приложения (`dist/src/main`)                    |
+| `pnpm lint`            | ESLint с автофиксом                                               |
+| `pnpm test`            | Unit-тесты                                                        |
+| `pnpm test:e2e`        | E2E-тесты (нужна PostgreSQL, см. ниже)                            |
+| `pnpm db:generate`     | Сгенерировать миграцию из `src/db/schema.ts`                      |
+| `pnpm db:migrate`      | Применить миграции (dev, через drizzle-kit)                       |
+| `pnpm db:migrate:prod` | Применить миграции из собранного кода (production, без drizzle-kit) |
+| `pnpm db:seed`         | Demo-данные для разработки                                        |
+| `pnpm db:studio`       | Drizzle Studio                                                    |
+| `pnpm openapi:export`  | Экспортировать OpenAPI-контракт в `openapi.json` (без БД)         |
 
-После запуска в режиме, отличном от `production`, Swagger доступен на `/api/docs`.
+### Изменения схемы БД
+
+Только через миграции:
+
+```bash
+# правим src/db/schema.ts
+pnpm db:generate   # создаёт файл в drizzle/
+pnpm db:migrate    # применяет
+```
+
+`db:push` для рабочих изменений **не используется**. Сгенерированные миграции и `drizzle/meta`
+вручную не редактируются и не удаляются.
+
+### E2E-тесты
+
+E2E работают с реальной PostgreSQL. Создайте отдельную БД, примените миграции и задайте `TEST_DATABASE_URL`:
+
+```bash
+createdb monshahub_test
+DATABASE_URL=postgresql://localhost:5432/monshahub_test pnpm db:migrate
+TEST_DATABASE_URL=postgresql://localhost:5432/monshahub_test pnpm test:e2e
+```
+
+Тесты создают данные с email-доменом `@e2e.monshahub.test` и удаляют их после прогона.
+Rate-limit в тестах отключён (`NODE_ENV=test`).
+
+## Production: миграции
+
+Production-образ не содержит `drizzle-kit`. Миграции применяются встроенным мигратором
+`drizzle-orm` (`src/db/migrate.ts`) из папки `drizzle/`, которая копируется в образ. Журнал
+(`drizzle.__drizzle_migrations`) общий с `drizzle-kit migrate`, поэтому оба способа взаимозаменяемы.
+
+- Docker Compose: сервис `migrate` запускается перед backend автоматически.
+- Отдельный деплой: выполнить **до** старта новой версии `node dist/src/db/migrate`
+  (в образе, с теми же `DATABASE_URL`, что и у backend), например как pre-deploy шаг / init-контейнер.
+- Миграции выполняются один раз на релиз, не на каждый экземпляр приложения.
+
+## API-документация и контракт
+
+- Swagger UI: `/api/docs`, JSON: `/api/docs-json` (вне `production`).
+- `pnpm openapi:export` пишет `openapi.json`. Frontend генерирует из него типы (`pnpm api:types`
+  в репозитории frontend) — это единственный источник истины по формам запросов/ответов.
+
+### Формат ошибок
+
+```json
+{
+  "statusCode": 400,
+  "code": "VALIDATION_ERROR",
+  "message": "Ошибка валидации",
+  "details": ["email must be an email"],
+  "path": "/auth/login",
+  "timestamp": "2026-01-01T00:00:00.000Z"
+}
+```
+
+`message` — всегда строка; `details` есть у ошибок валидации. Frontend различает ошибки по `code`
+(`src/common/errors/error-codes.ts`), а не по тексту.
 
 ## Структура проекта
 
 ```
 src/
-  auth/       # регистрация, логин, сброс пароля, JWT-guard
-  ai/         # обёртка над OpenAI
+  auth/       # регистрация (Organization + OWNER), логин, сброс пароля, JwtAuthGuard
+  staff/      # сотрудники организации (создание кассиров, только OWNER)
   mail/       # отправка писем
-  db/         # схема Drizzle
+  db/         # схема Drizzle, seed.ts, migrate.ts
   config/     # валидация переменных окружения
-  common/     # общие фильтры/утилиты (глобальный exception filter)
-  health/     # health-check эндпоинт
-shared/       # константы/типы, общие для нескольких модулей
+  common/     # декораторы (@Public/@Roles/@CurrentUser), RolesGuard, exception filter, коды ошибок
+  health/     # health-check
+shared/       # константы (роли) и утилиты
+drizzle/      # сгенерированные SQL-миграции (не править вручную)
+test/         # e2e-тесты
+scripts/      # экспорт OpenAPI
 ```
 
 ## Безопасность
 
-- Пароли хешируются, JWT хранится в httpOnly-cookie (`secure` включается автоматически в `production`).
-- Rate-limiting на `/auth/login`, `/auth/register`, `/auth/forgot-password`.
-- `helmet` для базовых security-заголовков.
-- Глобальный exception filter скрывает внутренние детали ошибок от клиента.
+- Пароли хешируются (bcrypt), JWT в httpOnly-cookie (`secure` в `production`).
+- Rate-limiting на auth-эндпоинтах, `helmet`, строгая валидация (`whitelist` + `forbidNonWhitelisted`).
+- Вход не раскрывает, существует ли email; `passwordHash` никогда не попадает в ответы API.
+- Глобальный exception filter скрывает внутренние детали ошибок.
 
-## CI/CD
+## CI
 
-В `.github/workflows/ci.yml` настроен пайплайн: установка зависимостей → lint → test → build,
-запускается на push/PR в `main`.
+`.github/workflows/ci.yml`: install → lint → test → build на push/PR в `main`.
+E2E в CI пока не запускаются (нужен сервис PostgreSQL).
 
 ## Лицензия
 
-Приватный шаблон, см. [LICENSE](./LICENSE).
+Приватный проект, см. [LICENSE](./LICENSE).

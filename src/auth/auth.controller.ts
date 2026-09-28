@@ -1,75 +1,103 @@
+import { Body, Controller, Get, HttpCode, Post, Res } from '@nestjs/common';
 import {
-  Body,
-  Controller,
-  Get,
-  Post,
-  Req,
-  Res,
-  UseGuards,
-} from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+  ApiCookieAuth,
+  ApiCreatedResponse,
+  ApiDefaultResponse,
+  ApiOkResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import type { Request, Response } from 'express';
-import { JwtAuthGuard } from './jwt.guard';
+import {
+  AuthUserResponseDto,
+  MessageResponseDto,
+  UserResponseDto,
+} from './dto/user-response.dto';
+import { CurrentUser, Public } from 'src/common/decorators/auth.decorators';
+import { ErrorResponseDto } from 'src/common/errors/error-response.dto';
+import type { AuthUser } from 'src/types/express';
+
+const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
 
 @ApiTags('auth')
+@ApiDefaultResponse({ type: ErrorResponseDto, description: 'Ошибка' })
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('register')
-  async register(@Body() params: RegisterDto) {
-    return await this.authService.register(params);
+  @ApiCreatedResponse({
+    type: AuthUserResponseDto,
+    description: 'Создаёт организацию и её владельца (OWNER)',
+  })
+  register(@Body() params: RegisterDto) {
+    return this.authService.register(params);
   }
 
+  @Public()
   @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('login')
+  @HttpCode(200)
+  @ApiOkResponse({
+    type: AuthUserResponseDto,
+    description: 'Устанавливает httpOnly cookie access_token',
+  })
   async login(
-    @Body()
-    params: LoginDto,
-    @Res({ passthrough: true })
-    res: Response,
+    @Body() params: LoginDto,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const { token, user, message } = await this.authService.login(params);
     res.cookie('access_token', token, {
-      httpOnly: true, // ❗ JS не может прочитать
+      httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: COOKIE_MAX_AGE,
     });
-    return {
-      message,
-      user,
-    };
+    return { message, user };
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard)
-  async me(@Req() req: Request) {
-    return this.authService.getMe(req.user!.id);
+  @ApiCookieAuth('access_token')
+  @ApiOkResponse({ type: UserResponseDto })
+  me(@CurrentUser() user: AuthUser) {
+    return this.authService.getMe(user.id);
   }
 
   @Post('logout')
-  @UseGuards(JwtAuthGuard)
+  @HttpCode(200)
+  @ApiCookieAuth('access_token')
+  @ApiOkResponse({ type: MessageResponseDto })
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('access_token');
+    res.clearCookie('access_token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
     return { message: 'Выход выполнен' };
   }
 
+  @Public()
   @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @Post('forgot-password')
-  async forgotPassword(@Body() params: ForgotPasswordDto) {
+  @HttpCode(200)
+  @ApiOkResponse({ type: MessageResponseDto })
+  forgotPassword(@Body() params: ForgotPasswordDto) {
     return this.authService.forgotPassword(params);
   }
 
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('reset-password')
-  async resetPassword(@Body() params: ResetPasswordDto) {
+  @HttpCode(200)
+  @ApiOkResponse({ type: MessageResponseDto })
+  resetPassword(@Body() params: ResetPasswordDto) {
     return this.authService.resetPassword(params);
   }
 }

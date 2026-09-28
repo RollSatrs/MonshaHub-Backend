@@ -1,22 +1,30 @@
-// src/auth/dto/register.dto.ts
 import {
   IsEmail,
-  IsEnum,
   IsNotEmpty,
   IsString,
+  MaxLength,
   MinLength,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { ROLES } from 'shared/constants/roles';
-import type { Role } from 'shared/type/type.role';
 
+/** Публичная регистрация создаёт новую организацию и её владельца (OWNER). Роль выбрать нельзя. */
 export class RegisterDto {
-  @ApiProperty()
+  @ApiProperty({
+    example: 'Баня «Парная»',
+    description: 'Название бани / комплекса',
+  })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(255)
+  organizationName: string;
+
+  @ApiProperty({ example: 'Иван Иванов' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
   fullname: string;
 
-  @ApiProperty({ example: 'user@example.com' })
+  @ApiProperty({ example: 'owner@example.com' })
   @IsEmail()
   email: string;
 
@@ -24,8 +32,4 @@ export class RegisterDto {
   @IsString()
   @MinLength(8)
   password: string;
-
-  @ApiProperty({ enum: ROLES })
-  @IsEnum(ROLES)
-  role: Role;
 }
