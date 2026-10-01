@@ -42,12 +42,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
     let code: ErrorCode = ErrorCode.INTERNAL_ERROR;
     let message = 'Внутренняя ошибка сервера';
     let details: string[] | undefined;
+    let meta: Record<string, unknown> | undefined;
 
     if (exception instanceof AppException) {
       status = exception.getStatus();
       code = exception.code;
       message = exception.message;
       details = exception.details;
+      meta = exception.meta;
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       code = CODE_BY_STATUS[status] ?? ErrorCode.INTERNAL_ERROR;
@@ -76,6 +78,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       code,
       message,
       ...(details ? { details } : {}),
+      ...(meta ? { meta } : {}),
       path: request.url,
       timestamp: new Date().toISOString(),
     });

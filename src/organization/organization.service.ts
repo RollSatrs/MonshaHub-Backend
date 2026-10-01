@@ -9,6 +9,7 @@ const toResponse = (o: typeof organizationsTable.$inferSelect) => ({
   name: o.name,
   currency: o.currency,
   timezone: o.timezone,
+  timeStepMinutes: o.timeStepMinutes,
 });
 
 @Injectable()
@@ -24,9 +25,15 @@ export class OrganizationService {
   }
 
   async update(organizationId: number, dto: UpdateOrganizationDto) {
+    const set: Partial<typeof organizationsTable.$inferInsert> = {};
+    if (dto.name !== undefined) set.name = dto.name.trim();
+    if (dto.timeStepMinutes !== undefined)
+      set.timeStepMinutes = dto.timeStepMinutes;
+    if (!Object.keys(set).length) return this.get(organizationId);
+
     const [org] = await db
       .update(organizationsTable)
-      .set({ name: dto.name.trim() })
+      .set(set)
       .where(eq(organizationsTable.id, organizationId))
       .returning();
     if (!org) throw new NotFoundException('Организация не найдена');

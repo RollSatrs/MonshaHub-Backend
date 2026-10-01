@@ -26,7 +26,8 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:migrate:prod": "node dist/src/db/migrate",
     "openapi:export": "ts-node -r tsconfig-paths/register scripts/export-openapi.ts",
-    "openapi:check": "pnpm openapi:export && git diff --exit-code -- openapi.json"
+    "openapi:check": "pnpm openapi:export && git diff --exit-code -- openapi.json",
+    "db:seed:demo": "ts-node -r tsconfig-paths/register src/db/seed-demo.ts"
   },
   "lint-staged": {
     "*.ts": [

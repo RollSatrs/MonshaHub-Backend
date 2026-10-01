@@ -10,15 +10,22 @@ export type DbExecutor =
   | typeof db
   | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-export type StockMovementType = 'RESTOCK' | 'WRITE_OFF' | 'ADJUSTMENT' | 'SALE';
+export type StockMovementType =
+  | 'RESTOCK'
+  | 'WRITE_OFF'
+  | 'ADJUSTMENT'
+  | 'SALE'
+  | 'SALE_RETURN';
 
 export interface StockMovementInput {
   organizationId: number;
   productId: number;
   type: StockMovementType;
-  /** Знак должен соответствовать типу (RESTOCK > 0; WRITE_OFF/SALE < 0; ADJUSTMENT любой ≠ 0) */
+  /** Знак должен соответствовать типу (RESTOCK/SALE_RETURN > 0; WRITE_OFF/SALE < 0; ADJUSTMENT любой ≠ 0) */
   quantityDelta: number;
   reason?: string | null;
+  /** позиция посещения, к которой относится SALE / SALE_RETURN */
+  visitItemId?: number | null;
   userId: number;
 }
 
@@ -74,6 +81,7 @@ export async function applyStockMovement(
       quantityDelta,
       balanceAfter: updated.stock,
       reason: input.reason ?? null,
+      visitItemId: input.visitItemId ?? null,
       createdBy: input.userId,
     })
     .returning();

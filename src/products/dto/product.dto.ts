@@ -119,8 +119,10 @@ export class StockMovementResponseDto {
   @ApiProperty() id: number;
   @ApiProperty() productId: number;
 
-  @ApiProperty({ enum: ['RESTOCK', 'WRITE_OFF', 'ADJUSTMENT', 'SALE'] })
-  type: 'RESTOCK' | 'WRITE_OFF' | 'ADJUSTMENT' | 'SALE';
+  @ApiProperty({
+    enum: ['RESTOCK', 'WRITE_OFF', 'ADJUSTMENT', 'SALE', 'SALE_RETURN'],
+  })
+  type: 'RESTOCK' | 'WRITE_OFF' | 'ADJUSTMENT' | 'SALE' | 'SALE_RETURN';
 
   @ApiProperty({ example: 20 }) quantityDelta: number;
   @ApiProperty({ example: 70, description: 'Остаток после операции' })

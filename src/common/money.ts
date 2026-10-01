@@ -45,3 +45,27 @@ export function multiplyMoney(price: string, quantity: number): string {
   }
   return minorToMoney(moneyToMinor(price) * BigInt(quantity));
 }
+
+/**
+ * Цена за час × минуты, округление half-up до минимальной единицы.
+ * При минутах, кратных 60, дробей нет — округление не срабатывает.
+ * Это единственное место, где дробится сумма (для шага 15/30 минут).
+ */
+export function proratePerHour(hourlyRate: string, minutes: number): string {
+  if (!Number.isInteger(minutes) || minutes <= 0) {
+    throw new Error('Минуты должны быть целым положительным числом');
+  }
+  const minor = moneyToMinor(hourlyRate) * BigInt(minutes);
+  return minorToMoney((minor * 2n + 60n) / 120n);
+}
+
+/** Сравнение сумм без float. */
+export function compareMoney(a: string, b: string): -1 | 0 | 1 {
+  const x = moneyToMinor(a);
+  const y = moneyToMinor(b);
+  return x === y ? 0 : x < y ? -1 : 1;
+}
+
+export function subtractMoney(a: string, b: string): string {
+  return minorToMoney(moneyToMinor(a) - moneyToMinor(b));
+}

@@ -18,6 +18,14 @@ export class ErrorResponseDto {
   })
   details?: string[];
 
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: true,
+    description:
+      'Структурированные подробности ошибки (например, время ближайшей брони при BOOKING_CONFLICT)',
+  })
+  meta?: Record<string, unknown>;
+
   @ApiProperty({ example: '/auth/login' })
   path: string;
 

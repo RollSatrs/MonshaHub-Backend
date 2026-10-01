@@ -5,6 +5,9 @@ import {
   moneyToMinor,
   multiplyMoney,
   normalizeMoney,
+  proratePerHour,
+  compareMoney,
+  subtractMoney,
 } from './money';
 
 describe('money', () => {
@@ -50,5 +53,24 @@ describe('money', () => {
     expect(() => minorToMoney(-1n)).toThrow();
     expect(() => multiplyMoney('10', -1)).toThrow();
     expect(() => multiplyMoney('10', 1.5)).toThrow();
+  });
+
+  it('proratePerHour: целые шаги без округления, дробные — half-up', () => {
+    expect(proratePerHour('10000.00', 60)).toBe('10000.00');
+    expect(proratePerHour('10000.00', 120)).toBe('20000.00');
+    expect(proratePerHour('10000.00', 30)).toBe('5000.00');
+    expect(proratePerHour('10000.00', 15)).toBe('2500.00');
+    // 12345.67 / 2 = 6172.835 → 6172.84 (half-up)
+    expect(proratePerHour('12345.67', 30)).toBe('6172.84');
+    // 100.01 / 4 = 25.0025 → 25.00
+    expect(proratePerHour('100.01', 15)).toBe('25.00');
+    expect(() => proratePerHour('10', 0)).toThrow();
+  });
+
+  it('compareMoney / subtractMoney точны', () => {
+    expect(compareMoney('0.10', '0.1')).toBe(0);
+    expect(compareMoney('1.00', '0.99')).toBe(1);
+    expect(compareMoney('0.99', '1')).toBe(-1);
+    expect(subtractMoney('10.00', '0.01')).toBe('9.99');
   });
 });

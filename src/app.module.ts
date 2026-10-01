@@ -9,6 +9,10 @@ import { RoomsModule } from './rooms/rooms.module';
 import { TariffsModule } from './tariffs/tariffs.module';
 import { ProductsModule } from './products/products.module';
 import { BathServicesModule } from './bath-services/bath-services.module';
+import { BookingsModule } from './bookings/bookings.module';
+import { VisitsModule } from './visits/visits.module';
+import { LiveModule } from './live/live.module';
+import { ClockModule } from './common/clock';
 import { HealthController } from './health/health.controller';
 import { validateEnv } from './config/env.validation';
 import { JwtAuthGuard } from './auth/jwt.guard';
@@ -21,7 +25,9 @@ import { RolesGuard } from './common/guards/roles.guard';
       validate: validateEnv,
     }),
     ThrottlerModule.forRoot({
-      throttlers: [{ ttl: 60_000, limit: 60 }],
+      // 300/мин на IP: кассиры одной бани сидят за одним IP, а «Баня сейчас» опрашивает backend.
+      // Строгие лимиты остаются на auth-эндпоинтах (@Throttle).
+      throttlers: [{ ttl: 60_000, limit: 300 }],
       // в тестах лимиты отключены, чтобы e2e не упирался в 429
       skipIf: () => process.env.NODE_ENV === 'test',
     }),
@@ -32,6 +38,10 @@ import { RolesGuard } from './common/guards/roles.guard';
     TariffsModule,
     ProductsModule,
     BathServicesModule,
+    ClockModule,
+    BookingsModule,
+    VisitsModule,
+    LiveModule,
   ],
   controllers: [HealthController],
   providers: [

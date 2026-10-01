@@ -20,3 +20,9 @@ export function uniqueViolation(err: unknown): string | undefined {
 export function isForeignKeyViolation(err: unknown): boolean {
   return pg(err)?.code === '23503';
 }
+
+/** Нарушение EXCLUDE-ограничения (пересечение интервалов). Возвращает имя ограничения. */
+export function exclusionViolation(err: unknown): string | undefined {
+  const e = pg(err);
+  return e?.code === '23P01' ? (e.constraint ?? '') : undefined;
+}

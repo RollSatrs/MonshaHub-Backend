@@ -74,7 +74,7 @@ const SERVICES = [
   { name: 'Парение', price: '3000.00' },
 ] as const;
 
-async function seed() {
+export async function seedBase() {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('Seed запрещён в production');
   }
@@ -192,9 +192,11 @@ async function seed() {
     console.log(`  ${u.role}: ${u.email} / ${DEMO_PASSWORD}`);
 }
 
-seed()
-  .then(() => process.exit(0))
-  .catch((err) => {
-    console.error(err);
-    process.exit(1);
-  });
+if (require.main === module) {
+  seedBase()
+    .then(() => process.exit(0))
+    .catch((err) => {
+      console.error(err);
+      process.exit(1);
+    });
+}

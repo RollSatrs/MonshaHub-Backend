@@ -1477,6 +1477,1242 @@
           "services"
         ]
       }
+    },
+    "/bookings": {
+      "get": {
+        "description": "Доступно OWNER и CASHIER.",
+        "operationId": "BookingsController_list",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Брони, заканчивающиеся не раньше этого времени. По умолчанию — сейчас.",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Брони, начинающиеся не позже этого времени",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "roomId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "По умолчанию — BOOKED",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "BOOKED",
+                "STARTED",
+                "CANCELLED",
+                "NO_SHOW"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BookingResponseDto"
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Брони (по умолчанию — предстоящие BOOKED)",
+        "tags": [
+          "bookings"
+        ]
+      },
+      "post": {
+        "description": "Пересечение с другой бронью или идущим посещением — 409 BOOKING_CONFLICT (в meta: время конфликта).",
+        "operationId": "BookingsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBookingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Создать бронь PRIVATE-помещения",
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/bookings/{id}": {
+      "patch": {
+        "operationId": "BookingsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBookingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Изменить/перенести бронь (только BOOKED)",
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/bookings/{id}/cancel": {
+      "post": {
+        "operationId": "BookingsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseBookingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Отменить бронь",
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/bookings/{id}/no-show": {
+      "post": {
+        "operationId": "BookingsController_noShow",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseBookingDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingResponseDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Отметить неявку",
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/bookings/{id}/start-visit": {
+      "post": {
+        "description": "Посещение стартует «сейчас» на длительность брони (или указанную). Пересечение со следующей бронью — 409 BOOKING_CONFLICT.",
+        "operationId": "BookingsController_startVisit",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartBookingVisitDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Начать посещение по брони",
+        "tags": [
+          "bookings"
+        ]
+      }
+    },
+    "/visits/private": {
+      "post": {
+        "description": "Оплачиваемая длительность фиксируется сразу (кратна шагу организации). Ошибки: ROOM_NOT_AVAILABLE (занято/на уборке), BOOKING_CONFLICT (пересечение с бронью), TARIFF_NOT_CONFIGURED.",
+        "operationId": "VisitsController_startPrivate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartPrivateVisitDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Начать посещение PRIVATE-помещения (walk-in)",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/visits/public": {
+      "post": {
+        "description": "Создаёт посещение с позициями входа (цена — snapshot тарифа). Ошибки: ROOM_CAPACITY_EXCEEDED, TARIFF_NOT_CONFIGURED.",
+        "operationId": "VisitsController_startPublic",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartPublicVisitDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Вход в общественный зал: новый чек человека/группы",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/visits": {
+      "get": {
+        "description": "CASHIER — только последние 24 часа, OWNER — вся история организации.",
+        "operationId": "VisitsController_list",
+        "parameters": [
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Без параметра — история (COMPLETED и CANCELLED). CASHIER видит только последние 24 часа.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACTIVE",
+                "COMPLETED",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "roomId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "ISO-время: с этого момента (по времени завершения/отмены)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "ISO-время: по этот момент",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          },
+          {
+            "name": "offset",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": 0,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitListDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "История посещений",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/visits/{id}": {
+      "get": {
+        "operationId": "VisitsController_get",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Посещение: позиции, платежи, итог, оплачено, остаток",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/visits/{id}/products": {
+      "post": {
+        "description": "Одной транзакцией: позиция + уменьшение остатка + движение SALE. INSUFFICIENT_STOCK откатывает всё.",
+        "operationId": "VisitsController_addProduct",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddProductDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Добавить товар",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/visits/{id}/services": {
+      "post": {
+        "operationId": "VisitsController_addService",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddServiceDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Добавить услугу (без складского движения)",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/visits/{id}/guests": {
+      "post": {
+        "description": "Проверяет вместимость: ROOM_CAPACITY_EXCEEDED.",
+        "operationId": "VisitsController_addGuests",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddGuestsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Добавить гостей в чек общественного зала",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/visits/{id}/extend": {
+      "post": {
+        "description": "На целое число шагов. Продление считается от прежнего конца (при просрочке — задним числом). Пересечение со следующей бронью — 409 BOOKING_CONFLICT (meta.availableMinutes).",
+        "operationId": "VisitsController_extend",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtendVisitDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Продлить PRIVATE-посещение",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/visits/{id}/items/{itemId}/void": {
+      "post": {
+        "description": "Позиция не удаляется: сохраняются кто, когда и причина. Товар возвращается на склад (SALE_RETURN). Время помещения убрать нельзя. Оплаченную позицию — нельзя (ITEM_ALREADY_PAID).",
+        "operationId": "VisitsController_voidItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VoidItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Убрать ошибочную позицию",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/visits/{id}/payments": {
+      "post": {
+        "description": "Можно несколько платежей (разные методы). Сумма не больше остатка: PAYMENT_EXCEEDS_BALANCE.",
+        "operationId": "VisitsController_addPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Принять платёж",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/visits/{id}/complete": {
+      "post": {
+        "description": "Только при полной оплате. Платежи из тела применяются в той же транзакции; если оплата не покрывает итог — 409 VISIT_NOT_PAID и ничего не сохраняется. PRIVATE после завершения переходит на уборку.",
+        "operationId": "VisitsController_complete",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteVisitDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Завершить посещение (выход)",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/visits/{id}/cancel": {
+      "post": {
+        "description": "Только пока нет платежей (VISIT_HAS_PAYMENTS). Товары возвращаются на склад. Сохраняются кто, когда и причина.",
+        "operationId": "VisitsController_cancel",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelVisitDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Отменить посещение, начатое по ошибке",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
+    "/rooms/{id}/finish-cleaning": {
+      "post": {
+        "description": "CLEANING_NOT_ACTIVE, если помещение не на уборке.",
+        "operationId": "RoomOpsController_finishCleaning",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CleaningFinishedDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Уборка завершена: помещение снова свободно",
+        "tags": [
+          "rooms"
+        ]
+      }
+    },
+    "/rooms/{id}/inside": {
+      "get": {
+        "operationId": "RoomOpsController_inside",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsideDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "«Внутри сейчас» — активные чеки общественного зала",
+        "tags": [
+          "rooms"
+        ]
+      }
+    },
+    "/rooms/{id}/complete-paid": {
+      "post": {
+        "description": "Массово завершает активные чеки зала, у которых оплачено = итог. Остальные не затрагиваются.",
+        "operationId": "RoomOpsController_completePaid",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageCountDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Завершить все оплаченные посещения общественного зала",
+        "tags": [
+          "rooms"
+        ]
+      }
+    },
+    "/live/board": {
+      "get": {
+        "description": "Состояние (AVAILABLE, OCCUPIED, ENDING_SOON, OVERTIME, CLEANING, OPEN, FULL) вычисляет backend. Frontend отсчитывает время от endsAt и serverTime и периодически перезапрашивает.",
+        "operationId": "LiveController_board",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LiveBoardDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "«Баня сейчас»: состояние всех помещений",
+        "tags": [
+          "live"
+        ]
+      }
     }
   },
   "info": {
@@ -1521,6 +2757,19 @@
               "TARIFF_ALREADY_EXISTS",
               "TARIFF_ROOM_TYPE_MISMATCH",
               "CANNOT_DEACTIVATE_SELF",
+              "TARIFF_NOT_CONFIGURED",
+              "ROOM_TYPE_MISMATCH",
+              "ROOM_CAPACITY_EXCEEDED",
+              "VISIT_NOT_ACTIVE",
+              "VISIT_NOT_PAID",
+              "VISIT_HAS_PAYMENTS",
+              "PAYMENT_EXCEEDS_BALANCE",
+              "ITEM_ALREADY_PAID",
+              "ITEM_NOT_VOIDABLE",
+              "BOOKING_NOT_ACTIVE",
+              "CLEANING_NOT_ACTIVE",
+              "PRODUCT_NOT_AVAILABLE",
+              "SERVICE_NOT_AVAILABLE",
               "ROOM_NOT_AVAILABLE",
               "BOOKING_CONFLICT",
               "INSUFFICIENT_STOCK",
@@ -1538,6 +2787,11 @@
             "items": {
               "type": "string"
             }
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Структурированные подробности ошибки (например, время ближайшей брони при BOOKING_CONFLICT)"
           },
           "path": {
             "type": "string",
@@ -1793,13 +3047,24 @@
             "type": "string",
             "example": "Asia/Almaty",
             "description": "Часовой пояс (пока не изменяется)"
+          },
+          "timeStepMinutes": {
+            "type": "number",
+            "enum": [
+              15,
+              30,
+              60
+            ],
+            "example": 60,
+            "description": "Шаг оплачиваемого времени PRIVATE-посещения (мин): длительность старта и продления кратны шагу. Применяется к новым посещениям."
           }
         },
         "required": [
           "id",
           "name",
           "currency",
-          "timezone"
+          "timezone",
+          "timeStepMinutes"
         ]
       },
       "UpdateOrganizationDto": {
@@ -1808,11 +3073,17 @@
           "name": {
             "type": "string",
             "example": "Баня «Парная»"
+          },
+          "timeStepMinutes": {
+            "type": "number",
+            "enum": [
+              15,
+              30,
+              60
+            ],
+            "description": "Шаг времени: 15, 30 или 60 минут"
           }
-        },
-        "required": [
-          "name"
-        ]
+        }
       },
       "TariffResponseDto": {
         "type": "object",
@@ -2142,7 +3413,8 @@
               "RESTOCK",
               "WRITE_OFF",
               "ADJUSTMENT",
-              "SALE"
+              "SALE",
+              "SALE_RETURN"
             ]
           },
           "quantityDelta": {
@@ -2261,6 +3533,1082 @@
             "description": "false — архивировать услугу"
           }
         }
+      },
+      "BookingResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "roomId": {
+            "type": "number"
+          },
+          "roomName": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "customerPhone": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string",
+            "description": "ISO-время начала"
+          },
+          "endsAt": {
+            "type": "string",
+            "description": "ISO-время окончания"
+          },
+          "durationMinutes": {
+            "type": "number",
+            "description": "Длительность в минутах (endsAt − startsAt)"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "BOOKED",
+              "STARTED",
+              "CANCELLED",
+              "NO_SHOW"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "isLate": {
+            "type": "boolean",
+            "description": "true — бронь ещё не начата, но её время уже наступило"
+          },
+          "visitId": {
+            "type": "number",
+            "nullable": true,
+            "description": "Посещение, начатое по этой брони"
+          },
+          "closedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "closeReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "roomId",
+          "roomName",
+          "customerName",
+          "customerPhone",
+          "startsAt",
+          "endsAt",
+          "durationMinutes",
+          "status",
+          "notes",
+          "createdByName",
+          "isLate",
+          "visitId",
+          "closedAt",
+          "closeReason"
+        ]
+      },
+      "CreateBookingDto": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "number"
+          },
+          "customerName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "customerPhone": {
+            "type": "string",
+            "example": "+7 701 123 45 67"
+          },
+          "startsAt": {
+            "type": "string",
+            "example": "2026-01-01T18:00:00+05:00",
+            "description": "Начало брони (ISO 8601 с часовым поясом)"
+          },
+          "durationMinutes": {
+            "type": "number",
+            "example": 120,
+            "description": "Длительность в минутах, кратна шагу организации"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "roomId",
+          "customerName",
+          "customerPhone",
+          "startsAt",
+          "durationMinutes"
+        ]
+      },
+      "UpdateBookingDto": {
+        "type": "object",
+        "properties": {
+          "customerName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "customerPhone": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string"
+          },
+          "durationMinutes": {
+            "type": "number"
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "CloseBookingDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500
+          }
+        }
+      },
+      "StartBookingVisitDto": {
+        "type": "object",
+        "properties": {
+          "durationMinutes": {
+            "type": "number",
+            "description": "Оплачиваемая длительность. По умолчанию — длительность брони. Кратна шагу организации."
+          }
+        }
+      },
+      "VisitItemDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ROOM_TIME",
+              "ENTRY",
+              "PRODUCT",
+              "SERVICE"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Название на момент добавления (snapshot)"
+          },
+          "unitPrice": {
+            "type": "string",
+            "example": "2500.00",
+            "description": "Цена на момент добавления (snapshot)"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "minutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "ROOM_TIME: оплаченные минуты"
+          },
+          "guestCategory": {
+            "type": "string",
+            "enum": [
+              "ADULT",
+              "CHILD"
+            ],
+            "nullable": true
+          },
+          "lineTotal": {
+            "type": "string",
+            "example": "5000.00",
+            "description": "Сумма позиции (считает backend)"
+          },
+          "voided": {
+            "type": "boolean",
+            "description": "true — позиция убрана (в итог не входит)"
+          },
+          "voidedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "voidedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "voidReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "unitPrice",
+          "quantity",
+          "minutes",
+          "guestCategory",
+          "lineTotal",
+          "voided",
+          "voidedAt",
+          "voidedByName",
+          "voidReason",
+          "createdAt",
+          "createdByName"
+        ]
+      },
+      "PaymentDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "amount": {
+            "type": "string",
+            "example": "10000.00"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "CARD",
+              "KASPI",
+              "OTHER"
+            ]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "createdByName": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "method",
+          "createdAt",
+          "createdByName"
+        ]
+      },
+      "VisitDetailDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PRIVATE",
+              "PUBLIC"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "COMPLETED",
+              "CANCELLED"
+            ]
+          },
+          "roomId": {
+            "type": "number"
+          },
+          "roomName": {
+            "type": "string",
+            "description": "Название помещения на момент старта (snapshot)"
+          },
+          "bookingId": {
+            "type": "number",
+            "nullable": true
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "customerPhone": {
+            "type": "string",
+            "nullable": true
+          },
+          "guestsCount": {
+            "type": "number",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "endsAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "PRIVATE: оплаченный конец времени"
+          },
+          "endedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "Фактическое завершение"
+          },
+          "currency": {
+            "type": "string",
+            "example": "KZT"
+          },
+          "timeStepMinutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Шаг времени, действовавший при старте"
+          },
+          "hourlyRate": {
+            "type": "string",
+            "nullable": true,
+            "example": "10000.00",
+            "description": "Часовая ставка на момент старта"
+          },
+          "timeState": {
+            "type": "string",
+            "enum": [
+              "OCCUPIED",
+              "ENDING_SOON",
+              "OVERTIME"
+            ],
+            "nullable": true,
+            "description": "Только для ACTIVE PRIVATE, вычисляет backend"
+          },
+          "remainingSeconds": {
+            "type": "number",
+            "nullable": true,
+            "description": "Секунд до конца на serverTime (отрицательное — просрочка)"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisitItemDto"
+            }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PaymentDto"
+            }
+          },
+          "total": {
+            "type": "string",
+            "example": "31500.00",
+            "description": "Итог = сумма позиций без убранных"
+          },
+          "paid": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "balance": {
+            "type": "string",
+            "example": "31500.00",
+            "description": "Осталось оплатить"
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "UNPAID",
+              "PARTIAL",
+              "PAID"
+            ]
+          },
+          "guests": {
+            "type": "number",
+            "nullable": true,
+            "description": "PUBLIC: сколько гостей в этом чеке"
+          },
+          "completedByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelledAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelledByName": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          },
+          "serverTime": {
+            "type": "string",
+            "description": "Время сервера — от него считать обратный отсчёт"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "roomId",
+          "roomName",
+          "bookingId",
+          "customerName",
+          "customerPhone",
+          "guestsCount",
+          "startedAt",
+          "endsAt",
+          "endedAt",
+          "currency",
+          "timeStepMinutes",
+          "hourlyRate",
+          "timeState",
+          "remainingSeconds",
+          "items",
+          "payments",
+          "total",
+          "paid",
+          "balance",
+          "paymentStatus",
+          "guests",
+          "completedByName",
+          "cancelledAt",
+          "cancelledByName",
+          "cancelReason",
+          "serverTime"
+        ]
+      },
+      "StartPrivateVisitDto": {
+        "type": "object",
+        "properties": {
+          "customerName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "customerPhone": {
+            "type": "string",
+            "example": "+7 701 123 45 67"
+          },
+          "roomId": {
+            "type": "number"
+          },
+          "durationMinutes": {
+            "type": "number",
+            "example": 120,
+            "description": "Оплачиваемая длительность, минут. Кратна шагу организации (15/30/60)."
+          },
+          "guestsCount": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "roomId",
+          "durationMinutes"
+        ]
+      },
+      "GuestDto": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": [
+              "ADULT",
+              "CHILD"
+            ]
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 200,
+            "example": 2
+          }
+        },
+        "required": [
+          "category",
+          "quantity"
+        ]
+      },
+      "StartPublicVisitDto": {
+        "type": "object",
+        "properties": {
+          "customerName": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "customerPhone": {
+            "type": "string",
+            "example": "+7 701 123 45 67"
+          },
+          "roomId": {
+            "type": "number"
+          },
+          "guests": {
+            "description": "Кто входит: например 2 взрослых и 1 ребёнок",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GuestDto"
+            }
+          }
+        },
+        "required": [
+          "roomId",
+          "guests"
+        ]
+      },
+      "VisitSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "PRIVATE",
+              "PUBLIC"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "COMPLETED",
+              "CANCELLED"
+            ]
+          },
+          "roomName": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "endedAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "cancelledAt": {
+            "type": "string",
+            "nullable": true
+          },
+          "total": {
+            "type": "string",
+            "example": "31500.00"
+          },
+          "paid": {
+            "type": "string",
+            "example": "31500.00"
+          },
+          "voidedItemsCount": {
+            "type": "number",
+            "description": "Сколько позиций было убрано (OWNER видит подробности в посещении)"
+          },
+          "guests": {
+            "type": "number",
+            "nullable": true
+          },
+          "cancelReason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "roomName",
+          "customerName",
+          "startedAt",
+          "endedAt",
+          "cancelledAt",
+          "total",
+          "paid",
+          "voidedItemsCount",
+          "guests",
+          "cancelReason"
+        ]
+      },
+      "VisitListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VisitSummaryDto"
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "hasMore"
+        ]
+      },
+      "AddProductDto": {
+        "type": "object",
+        "properties": {
+          "productId": {
+            "type": "number"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 1
+          }
+        },
+        "required": [
+          "productId",
+          "quantity"
+        ]
+      },
+      "AddServiceDto": {
+        "type": "object",
+        "properties": {
+          "serviceId": {
+            "type": "number"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 1
+          }
+        },
+        "required": [
+          "serviceId",
+          "quantity"
+        ]
+      },
+      "AddGuestsDto": {
+        "type": "object",
+        "properties": {
+          "guests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GuestDto"
+            }
+          }
+        },
+        "required": [
+          "guests"
+        ]
+      },
+      "ExtendVisitDto": {
+        "type": "object",
+        "properties": {
+          "minutes": {
+            "type": "number",
+            "example": 60,
+            "description": "На сколько минут продлить; кратно шагу посещения"
+          }
+        },
+        "required": [
+          "minutes"
+        ]
+      },
+      "VoidItemDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "example": "Добавили по ошибке"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "CreatePaymentDto": {
+        "type": "object",
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "CASH",
+              "CARD",
+              "KASPI",
+              "OTHER"
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "example": "10000.00",
+            "pattern": "^\\d{1,10}(\\.\\d{1,2})?$",
+            "description": "Сумма платежа, не больше остатка к оплате"
+          }
+        },
+        "required": [
+          "method",
+          "amount"
+        ]
+      },
+      "CompleteVisitDto": {
+        "type": "object",
+        "properties": {
+          "payments": {
+            "description": "Платежи, применяемые в той же транзакции. Если после них оплата не покрывает итог — ничего не сохраняется (409 VISIT_NOT_PAID).",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CreatePaymentDto"
+            }
+          }
+        }
+      },
+      "CancelVisitDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "example": "Начали не в том помещении"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "CleaningFinishedDto": {
+        "type": "object",
+        "properties": {
+          "finished": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "finished"
+        ]
+      },
+      "InsideVisitDto": {
+        "type": "object",
+        "properties": {
+          "visitId": {
+            "type": "number"
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "adults": {
+            "type": "number"
+          },
+          "children": {
+            "type": "number"
+          },
+          "guests": {
+            "type": "number"
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "total": {
+            "type": "string",
+            "example": "2000.00"
+          },
+          "paid": {
+            "type": "string",
+            "example": "2000.00"
+          },
+          "balance": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "UNPAID",
+              "PARTIAL",
+              "PAID"
+            ]
+          }
+        },
+        "required": [
+          "visitId",
+          "customerName",
+          "adults",
+          "children",
+          "guests",
+          "startedAt",
+          "total",
+          "paid",
+          "balance",
+          "paymentStatus"
+        ]
+      },
+      "InsideDto": {
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "number"
+          },
+          "roomName": {
+            "type": "string"
+          },
+          "capacity": {
+            "type": "number"
+          },
+          "inside": {
+            "type": "number"
+          },
+          "visits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InsideVisitDto"
+            }
+          },
+          "serverTime": {
+            "type": "string",
+            "description": "Serverное время"
+          }
+        },
+        "required": [
+          "roomId",
+          "roomName",
+          "capacity",
+          "inside",
+          "visits",
+          "serverTime"
+        ]
+      },
+      "MessageCountDto": {
+        "type": "object",
+        "properties": {
+          "completed": {
+            "type": "number",
+            "description": "Сколько посещений завершено"
+          }
+        },
+        "required": [
+          "completed"
+        ]
+      },
+      "LiveVisitDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "customerName": {
+            "type": "string",
+            "nullable": true
+          },
+          "startedAt": {
+            "type": "string"
+          },
+          "endsAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "PRIVATE: оплаченный конец"
+          },
+          "total": {
+            "type": "string",
+            "example": "31500.00"
+          },
+          "paid": {
+            "type": "string",
+            "example": "0.00"
+          },
+          "balance": {
+            "type": "string",
+            "example": "31500.00"
+          },
+          "paymentStatus": {
+            "type": "string",
+            "enum": [
+              "UNPAID",
+              "PARTIAL",
+              "PAID"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "customerName",
+          "startedAt",
+          "endsAt",
+          "total",
+          "paid",
+          "balance",
+          "paymentStatus"
+        ]
+      },
+      "LiveBookingDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "startsAt": {
+            "type": "string"
+          },
+          "endsAt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "customerName",
+          "startsAt",
+          "endsAt"
+        ]
+      },
+      "LiveRoomDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "PRIVATE",
+              "PUBLIC"
+            ]
+          },
+          "capacity": {
+            "type": "number"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "AVAILABLE",
+              "OCCUPIED",
+              "ENDING_SOON",
+              "OVERTIME",
+              "CLEANING",
+              "OPEN",
+              "FULL"
+            ],
+            "description": "Вычисляет backend. PRIVATE: AVAILABLE, OCCUPIED, ENDING_SOON, OVERTIME, CLEANING. PUBLIC: OPEN, FULL."
+          },
+          "visit": {
+            "nullable": true,
+            "description": "PRIVATE: идущее посещение",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LiveVisitDto"
+              }
+            ]
+          },
+          "cleaningStartedAt": {
+            "type": "string",
+            "nullable": true,
+            "description": "CLEANING: когда началась уборка"
+          },
+          "nextBooking": {
+            "nullable": true,
+            "description": "Ближайшая будущая бронь (PRIVATE)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LiveBookingDto"
+              }
+            ]
+          },
+          "availableMinutes": {
+            "type": "number",
+            "nullable": true,
+            "description": "Для AVAILABLE: сколько минут свободно до ближайшей брони (null — брони нет)"
+          },
+          "inside": {
+            "type": "number",
+            "nullable": true,
+            "description": "PUBLIC: сколько человек внутри"
+          },
+          "activeVisits": {
+            "type": "number",
+            "nullable": true,
+            "description": "PUBLIC: сколько активных чеков"
+          },
+          "hasTariff": {
+            "type": "boolean",
+            "description": "false — не задан нужный тариф, начать посещение нельзя"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "type",
+          "capacity",
+          "state",
+          "visit",
+          "cleaningStartedAt",
+          "nextBooking",
+          "availableMinutes",
+          "inside",
+          "activeVisits",
+          "hasTariff"
+        ]
+      },
+      "LiveBoardDto": {
+        "type": "object",
+        "properties": {
+          "serverTime": {
+            "type": "string",
+            "description": "Время сервера — от него считать обратный отсчёт"
+          },
+          "endingSoonMinutes": {
+            "type": "number",
+            "description": "За сколько минут до конца помещение становится ENDING_SOON"
+          },
+          "currency": {
+            "type": "string",
+            "example": "KZT"
+          },
+          "timezone": {
+            "type": "string",
+            "example": "Asia/Almaty"
+          },
+          "timeStepMinutes": {
+            "type": "number",
+            "description": "Шаг оплачиваемого времени (15/30/60)"
+          },
+          "rooms": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LiveRoomDto"
+            }
+          }
+        },
+        "required": [
+          "serverTime",
+          "endingSoonMinutes",
+          "currency",
+          "timezone",
+          "timeStepMinutes",
+          "rooms"
+        ]
       }
     }
   }
