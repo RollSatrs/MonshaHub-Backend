@@ -611,17 +611,45 @@ export async function addProduct(
     throw conflict(ErrorCode.PRODUCT_NOT_AVAILABLE, 'Товар в архиве');
   }
 
-  const item = await insertItem(tx, {
-    organizationId: user.organizationId,
-    visitId: visit.id,
-    kind: 'PRODUCT',
-    productId: product.id,
-    nameSnapshot: product.name,
-    unitPrice: product.price,
-    quantity: input.quantity,
-    lineTotal: multiplyMoney(product.price, input.quantity),
-    createdBy: user.id,
-  });
+  const [existingItem] = await tx
+    .select()
+    .from(visitItemsTable)
+    .where(
+      and(
+        eq(visitItemsTable.visitId, visit.id),
+        eq(visitItemsTable.kind, 'PRODUCT'),
+        eq(visitItemsTable.productId, product.id),
+        eq(visitItemsTable.unitPrice, product.price),
+        isNull(visitItemsTable.voidedAt),
+      ),
+    )
+    .limit(1);
+
+  const item = existingItem
+    ? (
+        await tx
+          .update(visitItemsTable)
+          .set({
+            quantity: existingItem.quantity + input.quantity,
+            lineTotal: multiplyMoney(
+              product.price,
+              existingItem.quantity + input.quantity,
+            ),
+          })
+          .where(eq(visitItemsTable.id, existingItem.id))
+          .returning()
+      )[0]
+    : await insertItem(tx, {
+        organizationId: user.organizationId,
+        visitId: visit.id,
+        kind: 'PRODUCT',
+        productId: product.id,
+        nameSnapshot: product.name,
+        unitPrice: product.price,
+        quantity: input.quantity,
+        lineTotal: multiplyMoney(product.price, input.quantity),
+        createdBy: user.id,
+      });
 
   await applyStockMovement(tx, {
     organizationId: user.organizationId,
@@ -663,17 +691,42 @@ export async function addService(
     throw conflict(ErrorCode.SERVICE_NOT_AVAILABLE, 'Услуга в архиве');
   }
 
-  await insertItem(tx, {
-    organizationId: user.organizationId,
-    visitId: visit.id,
-    kind: 'SERVICE',
-    serviceId: service.id,
-    nameSnapshot: service.name,
-    unitPrice: service.price,
-    quantity: input.quantity,
-    lineTotal: multiplyMoney(service.price, input.quantity),
-    createdBy: user.id,
-  });
+  const [existingItem] = await tx
+    .select()
+    .from(visitItemsTable)
+    .where(
+      and(
+        eq(visitItemsTable.visitId, visit.id),
+        eq(visitItemsTable.kind, 'SERVICE'),
+        eq(visitItemsTable.serviceId, service.id),
+        eq(visitItemsTable.unitPrice, service.price),
+        isNull(visitItemsTable.voidedAt),
+      ),
+    )
+    .limit(1);
+
+  if (existingItem) {
+    const quantity = existingItem.quantity + input.quantity;
+    await tx
+      .update(visitItemsTable)
+      .set({
+        quantity,
+        lineTotal: multiplyMoney(service.price, quantity),
+      })
+      .where(eq(visitItemsTable.id, existingItem.id));
+  } else {
+    await insertItem(tx, {
+      organizationId: user.organizationId,
+      visitId: visit.id,
+      kind: 'SERVICE',
+      serviceId: service.id,
+      nameSnapshot: service.name,
+      unitPrice: service.price,
+      quantity: input.quantity,
+      lineTotal: multiplyMoney(service.price, input.quantity),
+      createdBy: user.id,
+    });
+  }
 }
 
 /** Исправление ошибочной позиции: погашается (кто/когда/почему), товар возвращается на склад (SALE_RETURN). */
@@ -683,6 +736,35 @@ export async function voidItem(
     user: AuthUser;
     visitId: number;
     itemId: number;
+    reason: string;
+    now: Date;
+  },
+) {
+  return removeItemQuantity(tx, input);
+}
+
+/** Уменьшает количество позиции, сохраняет убранную часть отдельной аудиторской строкой и возвращает товар на склад. */
+export async function reduceItem(
+  tx: Tx,
+  input: {
+    user: AuthUser;
+    visitId: number;
+    itemId: number;
+    quantity: number;
+    reason: string;
+    now: Date;
+  },
+) {
+  return removeItemQuantity(tx, input);
+}
+
+async function removeItemQuantity(
+  tx: Tx,
+  input: {
+    user: AuthUser;
+    visitId: number;
+    itemId: number;
+    quantity?: number;
     reason: string;
     now: Date;
   },
@@ -713,8 +795,18 @@ export async function voidItem(
     );
   }
 
+  const removedQuantity = input.quantity ?? item.quantity;
+  if (removedQuantity > item.quantity) {
+    throw conflict(
+      ErrorCode.ITEM_NOT_VOIDABLE,
+      'Нельзя убрать больше единиц, чем есть в позиции',
+      { availableQuantity: item.quantity },
+    );
+  }
+
   const { total, paid } = await visitTotals(tx, visit.id);
-  const newTotal = subtractMoney(total, item.lineTotal);
+  const removedTotal = multiplyMoney(item.unitPrice, removedQuantity);
+  const newTotal = subtractMoney(total, removedTotal);
   if (compareMoney(paid, newTotal) > 0) {
     throw conflict(
       ErrorCode.ITEM_ALREADY_PAID,
@@ -723,23 +815,58 @@ export async function voidItem(
     );
   }
 
-  await tx
-    .update(visitItemsTable)
-    .set({
-      voidedAt: input.now,
-      voidedBy: user.id,
-      voidReason: input.reason.trim(),
-    })
-    .where(eq(visitItemsTable.id, item.id));
+  let movementItemId = item.id;
+  if (removedQuantity === item.quantity) {
+    await tx
+      .update(visitItemsTable)
+      .set({
+        voidedAt: input.now,
+        voidedBy: user.id,
+        voidReason: input.reason.trim(),
+      })
+      .where(eq(visitItemsTable.id, item.id));
+  } else {
+    const remainingQuantity = item.quantity - removedQuantity;
+    await tx
+      .update(visitItemsTable)
+      .set({
+        quantity: remainingQuantity,
+        lineTotal: multiplyMoney(item.unitPrice, remainingQuantity),
+      })
+      .where(eq(visitItemsTable.id, item.id));
+    const [removedItem] = await tx
+      .insert(visitItemsTable)
+      .values({
+        organizationId: item.organizationId,
+        visitId: item.visitId,
+        kind: item.kind,
+        productId: item.productId,
+        serviceId: item.serviceId,
+        tariffId: item.tariffId,
+        nameSnapshot: item.nameSnapshot,
+        unitPrice: item.unitPrice,
+        quantity: removedQuantity,
+        minutes: item.minutes,
+        guestCategory: item.guestCategory,
+        lineTotal: removedTotal,
+        createdBy: item.createdBy,
+        createdAt: item.createdAt,
+        voidedAt: input.now,
+        voidedBy: user.id,
+        voidReason: input.reason.trim(),
+      })
+      .returning({ id: visitItemsTable.id });
+    movementItemId = removedItem.id;
+  }
 
   if (item.kind === 'PRODUCT' && item.productId) {
     await applyStockMovement(tx, {
       organizationId: user.organizationId,
       productId: item.productId,
       type: 'SALE_RETURN',
-      quantityDelta: item.quantity,
+      quantityDelta: removedQuantity,
       reason: `Позиция убрана из посещения №${visit.id}: ${input.reason.trim()}`,
-      visitItemId: item.id,
+      visitItemId: movementItemId,
       userId: user.id,
     });
   }

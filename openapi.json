@@ -2365,6 +2365,71 @@
         ]
       }
     },
+    "/visits/{id}/items/{itemId}/reduce": {
+      "post": {
+        "description": "Убранная часть сохраняется в аудите. Для товара количество возвращается на склад движением SALE_RETURN.",
+        "operationId": "VisitsController_reduceItem",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          },
+          {
+            "name": "itemId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReduceItemDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitDetailDto"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Ошибка",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access_token": []
+          }
+        ],
+        "summary": "Уменьшить количество позиции",
+        "tags": [
+          "visits"
+        ]
+      }
+    },
     "/visits/{id}/payments": {
       "post": {
         "description": "Можно несколько платежей (разные методы). Сумма не больше остатка: PAYMENT_EXCEEDS_BALANCE.",
@@ -4241,6 +4306,26 @@
         },
         "required": [
           "reason"
+        ]
+      },
+      "ReduceItemDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "maxLength": 500,
+            "example": "Добавили по ошибке"
+          },
+          "quantity": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1000,
+            "example": 2
+          }
+        },
+        "required": [
+          "reason",
+          "quantity"
         ]
       },
       "CreatePaymentDto": {

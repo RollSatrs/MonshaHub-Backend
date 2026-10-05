@@ -339,6 +339,15 @@ export class VoidItemDto {
   reason: string;
 }
 
+export class ReduceItemDto extends VoidItemDto {
+  @ApiProperty({ minimum: 1, maximum: 1000, example: 2 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  quantity: number;
+}
+
 export class CancelVisitDto {
   @ApiProperty({ maxLength: 500, example: 'Начали не в том помещении' })
   @Trim()

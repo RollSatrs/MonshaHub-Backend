@@ -309,6 +309,53 @@ describe('PRIVATE Visit (e2e)', () => {
       });
     });
 
+    it('одинаковый товар объединяется в одну позицию; часть количества можно убрать с возвратом на склад', async () => {
+      const room = await mkPrivateRoom(ownerAgent(), '10000');
+      const product = await mkProduct(ownerAgent(), {
+        name: uniqueName('Шапка'),
+        price: '1500',
+        stock: 10,
+      });
+      const v = await mustStartPrivate(cashier.agent, room.id, 60);
+
+      await post(cashier.agent, `/visits/${v.id}/products`, {
+        productId: product.id,
+        quantity: 2,
+      }).expect(200);
+      const added = await post(cashier.agent, `/visits/${v.id}/products`, {
+        productId: product.id,
+        quantity: 3,
+      }).expect(200);
+      const productItems = (added.body as VisitBody).items.filter(
+        (i) => i.kind === 'PRODUCT' && !i.voided,
+      );
+      expect(productItems).toHaveLength(1);
+      expect(productItems[0]).toMatchObject({
+        quantity: 5,
+        lineTotal: '7500.00',
+      });
+      expect((await stockOf(product.id)).stock).toBe(5);
+
+      const reduced = await post(
+        cashier.agent,
+        `/visits/${v.id}/items/${productItems[0].id}/reduce`,
+        { quantity: 2, reason: 'Лишнее количество' },
+      ).expect(200);
+      const itemsAfter = (reduced.body as VisitBody).items.filter(
+        (i) => i.kind === 'PRODUCT',
+      );
+      expect(itemsAfter.find((i) => !i.voided)).toMatchObject({
+        quantity: 3,
+        lineTotal: '4500.00',
+      });
+      expect(itemsAfter.find((i) => i.voided)).toMatchObject({
+        quantity: 2,
+        lineTotal: '3000.00',
+        voidReason: 'Лишнее количество',
+      });
+      expect((await stockOf(product.id)).stock).toBe(7);
+    });
+
     it('недостаточно остатка → 409, откат ВСЕГО: нет позиции, нет движения, остаток и итог прежние', async () => {
       const room = await mkPrivateRoom(ownerAgent(), '10000');
       const product = await mkProduct(ownerAgent(), {

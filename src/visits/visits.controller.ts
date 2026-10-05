@@ -26,6 +26,7 @@ import {
   CreatePaymentDto,
   ExtendVisitDto,
   ListVisitsQueryDto,
+  ReduceItemDto,
   StartPrivateVisitDto,
   StartPublicVisitDto,
   VisitDetailDto,
@@ -163,6 +164,23 @@ export class VisitsController {
     @Body() dto: VoidItemDto,
   ) {
     return this.service.voidItem(user, id, itemId, dto);
+  }
+
+  @Post(':id/items/:itemId/reduce')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Уменьшить количество позиции',
+    description:
+      'Убранная часть сохраняется в аудите. Для товара количество возвращается на склад движением SALE_RETURN.',
+  })
+  @ApiOkResponse({ type: VisitDetailDto })
+  reduceItem(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Param('itemId', ParseIntPipe) itemId: number,
+    @Body() dto: ReduceItemDto,
+  ) {
+    return this.service.reduceItem(user, id, itemId, dto);
   }
 
   @Post(':id/payments')

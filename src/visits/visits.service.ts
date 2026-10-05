@@ -11,6 +11,7 @@ import {
   CreatePaymentDto,
   ExtendVisitDto,
   ListVisitsQueryDto,
+  ReduceItemDto,
   StartPrivateVisitDto,
   StartPublicVisitDto,
   VoidItemDto,
@@ -26,6 +27,7 @@ import {
   extendVisit,
   finishCleaning,
   mapVisitDbError,
+  reduceItem,
   startPrivateVisit,
   startPublicVisit,
   visitRoomId,
@@ -135,6 +137,25 @@ export class VisitsService {
   voidItem(user: AuthUser, visitId: number, itemId: number, dto: VoidItemDto) {
     return this.run(async (tx, now) => {
       await voidItem(tx, { user, visitId, itemId, reason: dto.reason, now });
+      return loadVisitDetail(tx, user, visitId, now);
+    });
+  }
+
+  reduceItem(
+    user: AuthUser,
+    visitId: number,
+    itemId: number,
+    dto: ReduceItemDto,
+  ) {
+    return this.run(async (tx, now) => {
+      await reduceItem(tx, {
+        user,
+        visitId,
+        itemId,
+        quantity: dto.quantity,
+        reason: dto.reason,
+        now,
+      });
       return loadVisitDetail(tx, user, visitId, now);
     });
   }
