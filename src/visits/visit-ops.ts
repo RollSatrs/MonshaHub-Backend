@@ -25,6 +25,7 @@ import {
 } from 'src/common/money';
 import { applyStockMovement, DbExecutor } from 'src/products/stock';
 import type { AuthUser } from 'src/types/express';
+import { requireBranchId } from 'src/common/access';
 
 /**
  * Все операции над посещениями. Вызываются внутри транзакции (tx).
@@ -106,6 +107,7 @@ export function mapVisitDbError(err: unknown): unknown {
 export async function lockRoom(
   tx: Tx,
   organizationId: number,
+  branchId: number,
   roomId: number,
 ): Promise<RoomRow> {
   const [room] = await tx
@@ -115,6 +117,7 @@ export async function lockRoom(
       and(
         eq(roomsTable.id, roomId),
         eq(roomsTable.organizationId, organizationId),
+        eq(roomsTable.branchId, branchId),
       ),
     )
     .limit(1)
@@ -126,6 +129,7 @@ export async function lockRoom(
 export async function lockVisit(
   tx: Tx,
   organizationId: number,
+  branchId: number,
   visitId: number,
 ): Promise<VisitRow> {
   const [visit] = await tx
@@ -135,6 +139,7 @@ export async function lockVisit(
       and(
         eq(visitsTable.id, visitId),
         eq(visitsTable.organizationId, organizationId),
+        eq(visitsTable.branchId, branchId),
       ),
     )
     .limit(1)
@@ -147,6 +152,7 @@ export async function lockVisit(
 export async function visitRoomId(
   tx: Tx,
   organizationId: number,
+  branchId: number,
   visitId: number,
 ): Promise<number> {
   const [v] = await tx
@@ -156,6 +162,7 @@ export async function visitRoomId(
       and(
         eq(visitsTable.id, visitId),
         eq(visitsTable.organizationId, organizationId),
+        eq(visitsTable.branchId, branchId),
       ),
     )
     .limit(1);
@@ -355,7 +362,8 @@ export async function startPrivateVisit(
   input: StartPrivateInput,
 ): Promise<number> {
   const { user, now } = input;
-  const room = await lockRoom(tx, user.organizationId, input.roomId);
+  const branchId = requireBranchId(user);
+  const room = await lockRoom(tx, user.organizationId, branchId, input.roomId);
   if (!room.active) throw roomNotAvailable('Помещение в архиве');
   if (room.type !== 'PRIVATE') {
     throw new AppException(
@@ -413,6 +421,7 @@ export async function startPrivateVisit(
     .insert(visitsTable)
     .values({
       organizationId: user.organizationId,
+      branchId,
       roomId: room.id,
       kind: 'PRIVATE',
       status: 'ACTIVE',
@@ -434,6 +443,7 @@ export async function startPrivateVisit(
 
   await insertItem(tx, {
     organizationId: user.organizationId,
+    branchId,
     visitId: visit.id,
     kind: 'ROOM_TIME',
     tariffId: tariff.id,
@@ -497,6 +507,7 @@ async function addEntryItems(
     }
     await insertItem(tx, {
       organizationId: user.organizationId,
+      branchId: requireBranchId(user),
       visitId,
       kind: 'ENTRY',
       tariffId: tariff.id,
@@ -525,7 +536,8 @@ export async function startPublicVisit(
   input: StartPublicInput,
 ): Promise<number> {
   const { user } = input;
-  const room = await lockRoom(tx, user.organizationId, input.roomId);
+  const branchId = requireBranchId(user);
+  const room = await lockRoom(tx, user.organizationId, branchId, input.roomId);
   if (!room.active) throw roomNotAvailable('Помещение в архиве');
   if (room.type !== 'PUBLIC') {
     throw new AppException(
@@ -540,6 +552,7 @@ export async function startPublicVisit(
     .insert(visitsTable)
     .values({
       organizationId: user.organizationId,
+      branchId,
       roomId: room.id,
       kind: 'PUBLIC',
       status: 'ACTIVE',
@@ -567,8 +580,14 @@ export async function addGuests(
   },
 ) {
   const { user } = input;
-  const room = await lockRoom(tx, user.organizationId, input.roomId);
-  const visit = await lockVisit(tx, user.organizationId, input.visitId);
+  const branchId = requireBranchId(user);
+  const room = await lockRoom(tx, user.organizationId, branchId, input.roomId);
+  const visit = await lockVisit(
+    tx,
+    user.organizationId,
+    branchId,
+    input.visitId,
+  );
   assertActive(visit);
   if (visit.kind !== 'PUBLIC') {
     throw new AppException(
@@ -593,7 +612,13 @@ export async function addProduct(
   },
 ) {
   const { user } = input;
-  const visit = await lockVisit(tx, user.organizationId, input.visitId);
+  const branchId = requireBranchId(user);
+  const visit = await lockVisit(
+    tx,
+    user.organizationId,
+    branchId,
+    input.visitId,
+  );
   assertActive(visit);
 
   const [product] = await tx
@@ -603,6 +628,7 @@ export async function addProduct(
       and(
         eq(productsTable.id, input.productId),
         eq(productsTable.organizationId, user.organizationId),
+        eq(productsTable.branchId, branchId),
       ),
     )
     .limit(1);
@@ -641,6 +667,7 @@ export async function addProduct(
       )[0]
     : await insertItem(tx, {
         organizationId: user.organizationId,
+        branchId,
         visitId: visit.id,
         kind: 'PRODUCT',
         productId: product.id,
@@ -653,6 +680,7 @@ export async function addProduct(
 
   await applyStockMovement(tx, {
     organizationId: user.organizationId,
+    branchId,
     productId: product.id,
     type: 'SALE',
     quantityDelta: -input.quantity,
@@ -673,7 +701,13 @@ export async function addService(
   },
 ) {
   const { user } = input;
-  const visit = await lockVisit(tx, user.organizationId, input.visitId);
+  const branchId = requireBranchId(user);
+  const visit = await lockVisit(
+    tx,
+    user.organizationId,
+    branchId,
+    input.visitId,
+  );
   assertActive(visit);
 
   const [service] = await tx
@@ -683,6 +717,7 @@ export async function addService(
       and(
         eq(servicesTable.id, input.serviceId),
         eq(servicesTable.organizationId, user.organizationId),
+        eq(servicesTable.branchId, branchId),
       ),
     )
     .limit(1);
@@ -717,6 +752,7 @@ export async function addService(
   } else {
     await insertItem(tx, {
       organizationId: user.organizationId,
+      branchId,
       visitId: visit.id,
       kind: 'SERVICE',
       serviceId: service.id,
@@ -770,7 +806,13 @@ async function removeItemQuantity(
   },
 ) {
   const { user } = input;
-  const visit = await lockVisit(tx, user.organizationId, input.visitId);
+  const branchId = requireBranchId(user);
+  const visit = await lockVisit(
+    tx,
+    user.organizationId,
+    branchId,
+    input.visitId,
+  );
   assertActive(visit);
 
   const [item] = await tx
@@ -838,6 +880,7 @@ async function removeItemQuantity(
       .insert(visitItemsTable)
       .values({
         organizationId: item.organizationId,
+        branchId: item.branchId,
         visitId: item.visitId,
         kind: item.kind,
         productId: item.productId,
@@ -862,6 +905,7 @@ async function removeItemQuantity(
   if (item.kind === 'PRODUCT' && item.productId) {
     await applyStockMovement(tx, {
       organizationId: user.organizationId,
+      branchId,
       productId: item.productId,
       type: 'SALE_RETURN',
       quantityDelta: removedQuantity,
@@ -888,8 +932,14 @@ export async function extendVisit(
   },
 ) {
   const { user } = input;
-  await lockRoom(tx, user.organizationId, input.roomId);
-  const visit = await lockVisit(tx, user.organizationId, input.visitId);
+  const branchId = requireBranchId(user);
+  await lockRoom(tx, user.organizationId, branchId, input.roomId);
+  const visit = await lockVisit(
+    tx,
+    user.organizationId,
+    branchId,
+    input.visitId,
+  );
   assertActive(visit);
   if (visit.kind !== 'PRIVATE' || !visit.endsAt || !visit.hourlyRate) {
     throw new AppException(
@@ -918,6 +968,7 @@ export async function extendVisit(
 
   await insertItem(tx, {
     organizationId: user.organizationId,
+    branchId,
     visitId: visit.id,
     kind: 'ROOM_TIME',
     tariffId: visit.tariffId,
@@ -962,6 +1013,7 @@ async function recordPayment(
   }
   await tx.insert(paymentsTable).values({
     organizationId: user.organizationId,
+    branchId: requireBranchId(user),
     visitId: visit.id,
     amount: minorToMoney(moneyToMinor(payment.amount)),
     method: payment.method,
@@ -973,7 +1025,12 @@ export async function addPayment(
   tx: Tx,
   input: { user: AuthUser; visitId: number; payment: PaymentInput },
 ) {
-  const visit = await lockVisit(tx, input.user.organizationId, input.visitId);
+  const visit = await lockVisit(
+    tx,
+    input.user.organizationId,
+    requireBranchId(input.user),
+    input.visitId,
+  );
   assertActive(visit);
   await recordPayment(tx, input.user, visit, input.payment);
 }
@@ -994,8 +1051,14 @@ export async function completeVisit(
   },
 ) {
   const { user, now } = input;
-  await lockRoom(tx, user.organizationId, input.roomId);
-  const visit = await lockVisit(tx, user.organizationId, input.visitId);
+  const branchId = requireBranchId(user);
+  await lockRoom(tx, user.organizationId, branchId, input.roomId);
+  const visit = await lockVisit(
+    tx,
+    user.organizationId,
+    branchId,
+    input.visitId,
+  );
   assertActive(visit);
 
   for (const p of input.payments) {
@@ -1019,6 +1082,7 @@ export async function completeVisit(
   if (visit.kind === 'PRIVATE') {
     await tx.insert(roomCleaningsTable).values({
       organizationId: user.organizationId,
+      branchId,
       roomId: visit.roomId,
       visitId: visit.id,
       startedAt: now,
@@ -1038,8 +1102,14 @@ export async function cancelVisit(
   },
 ) {
   const { user, now } = input;
-  await lockRoom(tx, user.organizationId, input.roomId);
-  const visit = await lockVisit(tx, user.organizationId, input.visitId);
+  const branchId = requireBranchId(user);
+  await lockRoom(tx, user.organizationId, branchId, input.roomId);
+  const visit = await lockVisit(
+    tx,
+    user.organizationId,
+    branchId,
+    input.visitId,
+  );
   assertActive(visit);
 
   const [pay] = await tx
@@ -1067,6 +1137,7 @@ export async function cancelVisit(
     if (!item.productId) continue;
     await applyStockMovement(tx, {
       organizationId: user.organizationId,
+      branchId,
       productId: item.productId,
       type: 'SALE_RETURN',
       quantityDelta: item.quantity,
@@ -1119,7 +1190,8 @@ export async function finishCleaning(
   input: { user: AuthUser; roomId: number; now: Date },
 ) {
   const { user } = input;
-  await lockRoom(tx, user.organizationId, input.roomId);
+  const branchId = requireBranchId(user);
+  await lockRoom(tx, user.organizationId, branchId, input.roomId);
   const finished = await tx
     .update(roomCleaningsTable)
     .set({ finishedAt: input.now, finishedBy: user.id })
@@ -1127,6 +1199,7 @@ export async function finishCleaning(
       and(
         eq(roomCleaningsTable.roomId, input.roomId),
         eq(roomCleaningsTable.organizationId, user.organizationId),
+        eq(roomCleaningsTable.branchId, branchId),
         isNull(roomCleaningsTable.finishedAt),
       ),
     )
@@ -1145,7 +1218,8 @@ export async function completeAllPaid(
   input: { user: AuthUser; roomId: number; now: Date },
 ): Promise<number> {
   const { user } = input;
-  const room = await lockRoom(tx, user.organizationId, input.roomId);
+  const branchId = requireBranchId(user);
+  const room = await lockRoom(tx, user.organizationId, branchId, input.roomId);
   if (room.type !== 'PUBLIC') {
     throw new AppException(
       ErrorCode.ROOM_TYPE_MISMATCH,

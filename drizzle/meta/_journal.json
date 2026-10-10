@@ -50,6 +50,34 @@
       "when": 1790616152280,
       "tag": "0006_bookings_no_overlap",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791359462918,
+      "tag": "0007_user_pin_login",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791370840660,
+      "tag": "0008_overjoyed_quentin_quire",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791371455527,
+      "tag": "0009_backfill_default_branches",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791371499199,
+      "tag": "0010_orange_loa",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,7 @@ import {
 } from 'src/db/schema';
 import type { AuthUser } from 'src/types/express';
 import { loadVisitDetail } from 'src/visits/visit-view';
+import { requireBranchId } from 'src/common/access';
 import {
   assertDuration,
   assertRoomFreeForBooking,
@@ -61,10 +62,12 @@ export class BookingsService {
   }
 
   async list(user: AuthUser, query: ListBookingsQueryDto) {
+    const branchId = requireBranchId(user);
     const now = this.clock.now();
     const from = query.from ? new Date(query.from) : now;
     const conditions = [
       eq(bookingsTable.organizationId, user.organizationId),
+      eq(bookingsTable.branchId, branchId),
       eq(bookingsTable.status, query.status ?? 'BOOKED'),
       gte(bookingsTable.endsAt, from),
     ];
@@ -78,11 +81,17 @@ export class BookingsService {
 
   create(user: AuthUser, dto: CreateBookingDto) {
     return this.run(async (tx, now) => {
+      const branchId = requireBranchId(user);
       const startsAt = new Date(dto.startsAt);
       if (startsAt.getTime() < now.getTime() - PAST_GRACE_MS) {
         throw invalid('Время брони уже прошло');
       }
-      const room = await lockRoom(tx, user.organizationId, dto.roomId);
+      const room = await lockRoom(
+        tx,
+        user.organizationId,
+        branchId,
+        dto.roomId,
+      );
       if (!room.active) throw invalid('Помещение в архиве');
       if (room.type !== 'PRIVATE') {
         throw new AppException(
@@ -103,6 +112,7 @@ export class BookingsService {
         .insert(bookingsTable)
         .values({
           organizationId: user.organizationId,
+          branchId,
           roomId: room.id,
           customerName: dto.customerName.trim(),
           customerPhone: dto.customerPhone.trim(),
@@ -118,8 +128,9 @@ export class BookingsService {
 
   update(user: AuthUser, id: number, dto: UpdateBookingDto) {
     return this.run(async (tx, now) => {
+      const branchId = requireBranchId(user);
       const roomId = await this.bookingRoomId(tx, user, id);
-      await lockRoom(tx, user.organizationId, roomId);
+      await lockRoom(tx, user.organizationId, branchId, roomId);
       const booking = await this.lockBooking(tx, user, id);
       if (booking.status !== 'BOOKED') throw notActive();
 
@@ -187,8 +198,9 @@ export class BookingsService {
     reason?: string,
   ) {
     return this.run(async (tx, now) => {
+      const branchId = requireBranchId(user);
       const roomId = await this.bookingRoomId(tx, user, id);
-      await lockRoom(tx, user.organizationId, roomId);
+      await lockRoom(tx, user.organizationId, branchId, roomId);
       const booking = await this.lockBooking(tx, user, id);
       if (booking.status !== 'BOOKED') throw notActive();
       await tx
@@ -207,8 +219,9 @@ export class BookingsService {
   /** Начать посещение по брони: фактическое время старта — «сейчас», длительность — как у брони (или указанная). */
   startVisit(user: AuthUser, id: number, dto: StartBookingVisitDto) {
     return this.run(async (tx, now) => {
+      const branchId = requireBranchId(user);
       const roomId = await this.bookingRoomId(tx, user, id);
-      await lockRoom(tx, user.organizationId, roomId);
+      await lockRoom(tx, user.organizationId, branchId, roomId);
       const booking = await this.lockBooking(tx, user, id);
       if (booking.status !== 'BOOKED') throw notActive();
 
@@ -251,6 +264,7 @@ export class BookingsService {
         and(
           eq(bookingsTable.id, id),
           eq(bookingsTable.organizationId, user.organizationId),
+          eq(bookingsTable.branchId, requireBranchId(user)),
         ),
       )
       .limit(1);
@@ -266,6 +280,7 @@ export class BookingsService {
         and(
           eq(bookingsTable.id, id),
           eq(bookingsTable.organizationId, user.organizationId),
+          eq(bookingsTable.branchId, requireBranchId(user)),
         ),
       )
       .limit(1)
@@ -280,6 +295,7 @@ export class BookingsService {
       and(
         eq(bookingsTable.id, id),
         eq(bookingsTable.organizationId, user.organizationId),
+        eq(bookingsTable.branchId, requireBranchId(user)),
       ),
       1,
     );

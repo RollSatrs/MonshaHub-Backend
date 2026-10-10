@@ -101,6 +101,31 @@ export const organizationsTable = pgTable(
   ],
 );
 
+export const branchesTable = pgTable(
+  'branches',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    organizationId: integer('organization_id')
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: 'cascade' }),
+    name: varchar({ length: 255 }).notNull(),
+    address: varchar({ length: 500 }),
+    phone: varchar({ length: 32 }),
+    timezone: varchar({ length: 64 }).default('Asia/Almaty').notNull(),
+    active: boolean().default(true).notNull(),
+    createdAt: createdAtTz(),
+    updatedAt: updatedAtTz(),
+  },
+  (t) => [
+    unique('branches_id_organization_unique').on(t.id, t.organizationId),
+    uniqueIndex('branches_organization_name_unique').on(
+      t.organizationId,
+      sql`lower(${t.name})`,
+    ),
+    index('branches_organization_active_idx').on(t.organizationId, t.active),
+  ],
+);
+
 export const usersTable = pgTable(
   'users',
   {
@@ -108,15 +133,47 @@ export const usersTable = pgTable(
     organizationId: integer('organization_id')
       .notNull()
       .references(() => organizationsTable.id, { onDelete: 'cascade' }),
+    branchId: integer('branch_id').references(() => branchesTable.id),
     fullname: varchar({ length: 255 }).notNull(),
     email: varchar({ length: 255 }).notNull().unique(),
     passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+    pinHash: varchar('pin_hash', { length: 255 }),
     role: userRoleEnum('user_role').default('CASHIER').notNull(),
     avatar: varchar({ length: 255 }),
     active: boolean().default(true).notNull(),
     createdAt: createdAt(),
   },
-  (t) => [index('users_organization_id_idx').on(t.organizationId)],
+  (t) => [
+    index('users_organization_id_idx').on(t.organizationId),
+    index('users_branch_id_idx').on(t.branchId),
+  ],
+);
+
+export const workplacesTable = pgTable(
+  'workplaces',
+  {
+    id: integer().primaryKey().generatedAlwaysAsIdentity(),
+    organizationId: integer('organization_id')
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: 'cascade' }),
+    branchId: integer('branch_id')
+      .notNull()
+      .references(() => branchesTable.id),
+    name: varchar({ length: 255 }).notNull(),
+    tokenHash: varchar('token_hash', { length: 255 }).notNull().unique(),
+    active: boolean().default(true).notNull(),
+    lastSeenAt: tstz('last_seen_at'),
+    createdAt: createdAtTz(),
+    updatedAt: updatedAtTz(),
+  },
+  (t) => [
+    index('workplaces_organization_idx').on(t.organizationId),
+    index('workplaces_branch_idx').on(t.branchId),
+    uniqueIndex('workplaces_branch_name_unique').on(
+      t.branchId,
+      sql`lower(${t.name})`,
+    ),
+  ],
 );
 
 export const passwordResetTokensTable = pgTable('password_reset_tokens', {
@@ -138,6 +195,9 @@ export const roomsTable = pgTable(
     organizationId: integer('organization_id')
       .notNull()
       .references(() => organizationsTable.id, { onDelete: 'cascade' }),
+    branchId: integer('branch_id')
+      .notNull()
+      .references(() => branchesTable.id),
     name: varchar({ length: 255 }).notNull(),
     // тип не меняется после создания: от него зависят тарифы
     type: roomTypeEnum().notNull(),
@@ -150,8 +210,9 @@ export const roomsTable = pgTable(
   (t) => [
     // нужен для композитных FK «своя организация» из дочерних таблиц
     unique('rooms_id_organization_unique').on(t.id, t.organizationId),
-    uniqueIndex('rooms_organization_name_unique').on(
+    uniqueIndex('rooms_branch_name_unique').on(
       t.organizationId,
+      t.branchId,
       sql`lower(${t.name})`,
     ),
     index('rooms_organization_active_sort_idx').on(
@@ -218,6 +279,9 @@ export const productsTable = pgTable(
     organizationId: integer('organization_id')
       .notNull()
       .references(() => organizationsTable.id, { onDelete: 'cascade' }),
+    branchId: integer('branch_id')
+      .notNull()
+      .references(() => branchesTable.id),
     name: varchar({ length: 255 }).notNull(),
     price: money('price').notNull(),
     // меняется только через stock_movements (атомарно)
@@ -228,8 +292,9 @@ export const productsTable = pgTable(
   },
   (t) => [
     unique('products_id_organization_unique').on(t.id, t.organizationId),
-    uniqueIndex('products_organization_name_unique').on(
+    uniqueIndex('products_branch_name_unique').on(
       t.organizationId,
+      t.branchId,
       sql`lower(${t.name})`,
     ),
     index('products_organization_active_idx').on(t.organizationId, t.active),
@@ -246,6 +311,9 @@ export const stockMovementsTable = pgTable(
     organizationId: integer('organization_id')
       .notNull()
       .references(() => organizationsTable.id, { onDelete: 'cascade' }),
+    branchId: integer('branch_id')
+      .notNull()
+      .references(() => branchesTable.id),
     productId: integer('product_id').notNull(),
     type: stockMovementTypeEnum().notNull(),
     quantityDelta: integer('quantity_delta').notNull(),
@@ -295,6 +363,9 @@ export const servicesTable = pgTable(
     organizationId: integer('organization_id')
       .notNull()
       .references(() => organizationsTable.id, { onDelete: 'cascade' }),
+    branchId: integer('branch_id')
+      .notNull()
+      .references(() => branchesTable.id),
     name: varchar({ length: 255 }).notNull(),
     price: money('price').notNull(),
     active: boolean().default(true).notNull(),
@@ -303,8 +374,9 @@ export const servicesTable = pgTable(
   },
   (t) => [
     unique('services_id_organization_unique').on(t.id, t.organizationId),
-    uniqueIndex('services_organization_name_unique').on(
+    uniqueIndex('services_branch_name_unique').on(
       t.organizationId,
+      t.branchId,
       sql`lower(${t.name})`,
     ),
     index('services_organization_active_idx').on(t.organizationId, t.active),
@@ -326,6 +398,9 @@ export const bookingsTable = pgTable(
     organizationId: integer('organization_id')
       .notNull()
       .references(() => organizationsTable.id, { onDelete: 'cascade' }),
+    branchId: integer('branch_id')
+      .notNull()
+      .references(() => branchesTable.id),
     roomId: integer('room_id').notNull(),
     customerName: varchar('customer_name', { length: 255 }).notNull(),
     customerPhone: varchar('customer_phone', { length: 32 }).notNull(),
@@ -370,6 +445,9 @@ export const visitsTable = pgTable(
     organizationId: integer('organization_id')
       .notNull()
       .references(() => organizationsTable.id, { onDelete: 'cascade' }),
+    branchId: integer('branch_id')
+      .notNull()
+      .references(() => branchesTable.id),
     roomId: integer('room_id').notNull(),
     kind: roomTypeEnum().notNull(),
     status: visitStatusEnum().default('ACTIVE').notNull(),
@@ -442,6 +520,9 @@ export const visitItemsTable = pgTable(
     organizationId: integer('organization_id')
       .notNull()
       .references(() => organizationsTable.id, { onDelete: 'cascade' }),
+    branchId: integer('branch_id')
+      .notNull()
+      .references(() => branchesTable.id),
     visitId: integer('visit_id').notNull(),
     kind: visitItemKindEnum().notNull(),
     productId: integer('product_id'),
@@ -516,6 +597,9 @@ export const paymentsTable = pgTable(
     organizationId: integer('organization_id')
       .notNull()
       .references(() => organizationsTable.id, { onDelete: 'cascade' }),
+    branchId: integer('branch_id')
+      .notNull()
+      .references(() => branchesTable.id),
     visitId: integer('visit_id').notNull(),
     amount: money('amount').notNull(),
     method: paymentMethodEnum().notNull(),
@@ -547,6 +631,9 @@ export const roomCleaningsTable = pgTable(
     organizationId: integer('organization_id')
       .notNull()
       .references(() => organizationsTable.id, { onDelete: 'cascade' }),
+    branchId: integer('branch_id')
+      .notNull()
+      .references(() => branchesTable.id),
     roomId: integer('room_id').notNull(),
     visitId: integer('visit_id').notNull(),
     startedAt: tstz('started_at').notNull(),

@@ -170,6 +170,7 @@ async function main() {
     email: u.email,
     role: u.role,
     organizationId: u.organizationId,
+    branchId: u.branchId,
   });
   const owner = toActor(users.find((u) => u.role === 'OWNER')!);
   const cashier = toActor(users.find((u) => u.role === 'CASHIER')!);
@@ -500,7 +501,7 @@ async function main() {
     '  VIP №1 занят · VIP №2 скоро закончится · VIP №3 уборка · Семейный зал свободен (впереди бронь)',
   );
   console.log(
-    '  Вход: owner@monshahub.demo / cashier@monshahub.demo, пароль demo12345',
+    '  Вход: owner@monshahub.demo / cashier@monshahub.demo, PIN 1234 (пароль demo12345)',
   );
 
   await app.close();

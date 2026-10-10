@@ -11,6 +11,7 @@ import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { PinLoginDto } from './dto/pin-login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import {
@@ -64,11 +65,34 @@ export class AuthController {
     return { message, user };
   }
 
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Post('pin-login')
+  @HttpCode(200)
+  @ApiOkResponse({
+    type: AuthUserResponseDto,
+    description: 'Вход на рабочем месте по email и четырёхзначному PIN',
+  })
+  async pinLogin(
+    @Body() params: PinLoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { token, user, message } =
+      await this.authService.loginWithPin(params);
+    res.cookie(AUTH_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: COOKIE_MAX_AGE,
+    });
+    return { message, user };
+  }
+
   @Get('me')
   @ApiCookieAuth('access_token')
   @ApiOkResponse({ type: UserResponseDto })
   me(@CurrentUser() user: AuthUser) {
-    return this.authService.getMe(user.id);
+    return this.authService.getMe(user.id, user.branchId);
   }
 
   @Public()

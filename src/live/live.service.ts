@@ -13,6 +13,7 @@ import {
 } from 'src/db/schema';
 import { paymentStatusOf } from 'src/visits/visit-view';
 import type { AuthUser } from 'src/types/express';
+import { requireBranchId } from 'src/common/access';
 import { InsideDto, LiveBoardDto, LiveRoomDto } from './dto/live.dto';
 import {
   computePrivateRoomState,
@@ -35,6 +36,7 @@ export class LiveService {
   async board(user: AuthUser): Promise<LiveBoardDto> {
     const now = this.clock.now();
     const orgId = user.organizationId;
+    const branchId = requireBranchId(user);
 
     const [org] = await db
       .select()
@@ -45,7 +47,11 @@ export class LiveService {
       .select()
       .from(roomsTable)
       .where(
-        and(eq(roomsTable.organizationId, orgId), eq(roomsTable.active, true)),
+        and(
+          eq(roomsTable.organizationId, orgId),
+          eq(roomsTable.branchId, branchId),
+          eq(roomsTable.active, true),
+        ),
       )
       .orderBy(asc(roomsTable.sortOrder), asc(roomsTable.id));
 
@@ -55,6 +61,7 @@ export class LiveService {
       .where(
         and(
           eq(visitsTable.organizationId, orgId),
+          eq(visitsTable.branchId, branchId),
           eq(visitsTable.status, 'ACTIVE'),
         ),
       );
@@ -65,6 +72,7 @@ export class LiveService {
       .where(
         and(
           eq(roomCleaningsTable.organizationId, orgId),
+          eq(roomCleaningsTable.branchId, branchId),
           isNull(roomCleaningsTable.finishedAt),
         ),
       );
@@ -78,7 +86,8 @@ export class LiveService {
     }>(sql`
       select distinct on (room_id) id, room_id, customer_name, starts_at, ends_at
       from bookings
-      where organization_id = ${orgId} and status = 'BOOKED' and ends_at > ${now}
+      where organization_id = ${orgId} and branch_id = ${branchId}
+        and status = 'BOOKED' and ends_at > ${now}
       order by room_id, starts_at
     `);
 
@@ -92,6 +101,7 @@ export class LiveService {
       .where(
         and(
           eq(visitsTable.organizationId, orgId),
+          eq(visitsTable.branchId, branchId),
           eq(visitsTable.status, 'ACTIVE'),
           eq(visitsTable.kind, 'PUBLIC'),
           eq(visitItemsTable.kind, 'ENTRY'),
@@ -221,6 +231,7 @@ export class LiveService {
   /** «Внутри сейчас» для PUBLIC-зала: активные чеки с числом гостей и временем входа. */
   async inside(user: AuthUser, roomId: number): Promise<InsideDto> {
     const now = this.clock.now();
+    const branchId = requireBranchId(user);
     const [room] = await db
       .select()
       .from(roomsTable)
@@ -228,6 +239,7 @@ export class LiveService {
         and(
           eq(roomsTable.id, roomId),
           eq(roomsTable.organizationId, user.organizationId),
+          eq(roomsTable.branchId, branchId),
         ),
       )
       .limit(1);
@@ -247,6 +259,7 @@ export class LiveService {
         and(
           eq(visitsTable.roomId, room.id),
           eq(visitsTable.organizationId, user.organizationId),
+          eq(visitsTable.branchId, branchId),
           eq(visitsTable.status, 'ACTIVE'),
         ),
       )

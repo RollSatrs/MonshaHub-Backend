@@ -171,6 +171,23 @@ describe('Services и Staff (e2e)', () => {
       expect(JSON.stringify(list)).not.toMatch(/password/i);
     });
 
+    it('создаёт кассира без пароля и разрешает вход по PIN', async () => {
+      const email = uniqueEmail('pin-only-cashier');
+      await ownerA.agent
+        .post('/staff/cashiers')
+        .send({
+          fullname: 'PIN Cashier',
+          email,
+          pin: '4826',
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post('/auth/pin-login')
+        .send({ email, pin: '4826' })
+        .expect(200);
+    });
+
     it('деактивация кассира закрывает доступ сразу (действующая сессия), реактивация возвращает', async () => {
       const cashier = await createCashier(ownerA, app);
       await cashier.agent.get('/auth/me').expect(200);

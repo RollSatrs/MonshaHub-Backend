@@ -4,9 +4,11 @@ import { JwtService } from '@nestjs/jwt';
 import * as crypto from 'crypto';
 import { db } from 'src';
 import {
+  branchesTable,
   organizationsTable,
   passwordResetTokensTable,
   usersTable,
+  workplacesTable,
 } from 'src/db/schema';
 import { hashFunction, unHashFunction } from 'shared/tools/tools';
 import { MailService } from 'src/mail/mail.service';
@@ -15,14 +17,23 @@ import { ErrorCode } from 'src/common/errors/error-codes';
 import type { AuthUser } from 'src/types/express';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { PinLoginDto } from './dto/pin-login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { toUserResponse } from './dto/user-response.dto';
+import { hashWorkplaceToken } from 'src/workplaces/workplaces.service';
 
 const INVALID_CREDENTIALS = () =>
   new AppException(
     ErrorCode.INVALID_CREDENTIALS,
     'Неверный email или пароль',
+    HttpStatus.UNAUTHORIZED,
+  );
+
+const INVALID_PIN_CREDENTIALS = () =>
+  new AppException(
+    ErrorCode.INVALID_CREDENTIALS,
+    'Неверный email или PIN',
     HttpStatus.UNAUTHORIZED,
   );
 
@@ -58,6 +69,11 @@ export class AuthService {
           .insert(organizationsTable)
           .values({ name: dto.organizationName.trim() })
           .returning();
+        await tx.insert(branchesTable).values({
+          organizationId: org.id,
+          name: 'Основной',
+          timezone: org.timezone,
+        });
         const [created] = await tx
           .insert(usersTable)
           .values({
@@ -98,21 +114,71 @@ export class AuthService {
     );
     if (!isPasswordValid) throw INVALID_CREDENTIALS();
 
-    const payload: AuthUser = {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      organizationId: user.organizationId,
-    };
-
-    return {
-      message: 'Успешный вход',
-      user: toUserResponse(user),
-      token: this.jwtService.sign(payload),
-    };
+    return this.createSession(user);
   }
 
-  async getMe(id: number) {
+  async loginWithPin(dto: PinLoginDto) {
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, dto.email.trim().toLowerCase()))
+      .limit(1);
+
+    if (!user || !user.active || !user.pinHash) {
+      throw INVALID_PIN_CREDENTIALS();
+    }
+    const isPinValid = await unHashFunction(dto.pin, user.pinHash);
+    if (!isPinValid) throw INVALID_PIN_CREDENTIALS();
+
+    let workplace: typeof workplacesTable.$inferSelect | undefined;
+    if (dto.workplaceToken) {
+      [workplace] = await db
+        .select()
+        .from(workplacesTable)
+        .where(
+          and(
+            eq(
+              workplacesTable.tokenHash,
+              hashWorkplaceToken(dto.workplaceToken),
+            ),
+            eq(workplacesTable.active, true),
+          ),
+        )
+        .limit(1);
+    }
+
+    if (user.role === 'CASHIER') {
+      const [registeredWorkplace] = await db
+        .select({ id: workplacesTable.id })
+        .from(workplacesTable)
+        .where(
+          and(
+            eq(workplacesTable.organizationId, user.organizationId),
+            eq(workplacesTable.active, true),
+          ),
+        )
+        .limit(1);
+      if (
+        registeredWorkplace &&
+        (!workplace ||
+          workplace.organizationId !== user.organizationId ||
+          workplace.branchId !== user.branchId)
+      ) {
+        throw INVALID_PIN_CREDENTIALS();
+      }
+    }
+
+    if (workplace && workplace.organizationId === user.organizationId) {
+      await db
+        .update(workplacesTable)
+        .set({ lastSeenAt: new Date() })
+        .where(eq(workplacesTable.id, workplace.id));
+    }
+
+    return this.createSession(user);
+  }
+
+  async getMe(id: number, activeBranchId?: number | null) {
     const [user] = await db
       .select()
       .from(usersTable)
@@ -125,7 +191,10 @@ export class AuthService {
         HttpStatus.UNAUTHORIZED,
       );
     }
-    return toUserResponse(user);
+    return toUserResponse({
+      ...user,
+      branchId: activeBranchId ?? user.branchId,
+    });
   }
 
   /** Всегда отвечает одинаково — не раскрывает, зарегистрирован ли email. */
@@ -188,5 +257,21 @@ export class AuthService {
       'Пользователь с таким email уже существует',
       HttpStatus.CONFLICT,
     );
+  }
+
+  private createSession(user: typeof usersTable.$inferSelect) {
+    const payload: AuthUser = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      organizationId: user.organizationId,
+      branchId: user.branchId,
+    };
+
+    return {
+      message: 'Успешный вход',
+      user: toUserResponse(user),
+      token: this.jwtService.sign(payload),
+    };
   }
 }

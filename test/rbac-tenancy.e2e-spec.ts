@@ -86,6 +86,91 @@ describe('RBAC и tenant isolation (e2e)', () => {
     expect(body.organizationId).toBe(owner.organizationId);
   });
 
+  it('филиалы изолированы, а рабочее место не пускает кассира другого филиала', async () => {
+    const owner = await registerOwner(app, 'Branches');
+    const initialBranches = await owner.agent.get('/branches').expect(200);
+    const mainBranchId = (initialBranches.body as { id: number }[])[0].id;
+    const second = await owner.agent
+      .post('/branches')
+      .send({ name: 'Второй филиал' })
+      .expect(201);
+    const secondBranchId = (second.body as { id: number }).id;
+
+    const mainRoom = await owner.agent
+      .post('/rooms')
+      .send({ name: uniqueEmail('main-room'), type: 'PRIVATE', capacity: 4 })
+      .expect(201);
+    const secondRoom = await owner.agent
+      .post('/rooms')
+      .set('x-branch-id', String(secondBranchId))
+      .send({ name: uniqueEmail('second-room'), type: 'PRIVATE', capacity: 4 })
+      .expect(201);
+
+    const mainList = await owner.agent.get('/rooms').expect(200);
+    expect((mainList.body as { id: number }[]).map((r) => r.id)).toContain(
+      (mainRoom.body as { id: number }).id,
+    );
+    expect((mainList.body as { id: number }[]).map((r) => r.id)).not.toContain(
+      (secondRoom.body as { id: number }).id,
+    );
+
+    const cashierEmail = uniqueEmail('branch-cashier');
+    await owner.agent
+      .post('/staff/cashiers')
+      .send({
+        fullname: 'Branch Cashier',
+        email: cashierEmail,
+        password: PASSWORD,
+        pin: '2468',
+        branchId: secondBranchId,
+      })
+      .expect(201);
+
+    const cashier = request.agent(app.getHttpServer());
+    await cashier
+      .post('/auth/pin-login')
+      .send({ email: cashierEmail, pin: '2468' })
+      .expect(200);
+    const cashierRooms = await cashier
+      .get('/rooms')
+      .set('x-branch-id', String(mainBranchId))
+      .expect(200);
+    expect((cashierRooms.body as { id: number }[]).map((r) => r.id)).toEqual([
+      (secondRoom.body as { id: number }).id,
+    ]);
+
+    const workplace = await owner.agent
+      .post('/workplaces')
+      .send({ name: 'Main checkout', branchId: mainBranchId })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/auth/pin-login')
+      .send({ email: cashierEmail, pin: '2468' })
+      .expect(401);
+    await request(app.getHttpServer())
+      .post('/auth/pin-login')
+      .send({
+        email: cashierEmail,
+        pin: '2468',
+        workplaceToken: (workplace.body as { activationToken: string })
+          .activationToken,
+      })
+      .expect(401);
+    const cashierWorkplace = await owner.agent
+      .post('/workplaces')
+      .send({ name: 'Second checkout', branchId: secondBranchId })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post('/auth/pin-login')
+      .send({
+        email: cashierEmail,
+        pin: '2468',
+        workplaceToken: (cashierWorkplace.body as { activationToken: string })
+          .activationToken,
+      })
+      .expect(200);
+  });
+
   it('без аутентификации закрыты все бизнес-эндпоинты', async () => {
     await request(app.getHttpServer()).get('/staff').expect(401);
     await request(app.getHttpServer())

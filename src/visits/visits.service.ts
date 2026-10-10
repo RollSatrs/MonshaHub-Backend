@@ -34,6 +34,7 @@ import {
   voidItem,
 } from './visit-ops';
 import { listVisits, loadVisitDetail } from './visit-view';
+import { requireBranchId } from 'src/common/access';
 
 /**
  * Тонкая обёртка: транзакция + время (Clock) + ответ VisitDetail, собранный в той же транзакции.
@@ -120,7 +121,12 @@ export class VisitsService {
 
   addGuests(user: AuthUser, visitId: number, dto: AddGuestsDto) {
     return this.run(async (tx, now) => {
-      const roomId = await visitRoomId(tx, user.organizationId, visitId);
+      const roomId = await visitRoomId(
+        tx,
+        user.organizationId,
+        requireBranchId(user),
+        visitId,
+      );
       await addGuests(tx, { user, visitId, roomId, guests: dto.guests });
       return loadVisitDetail(tx, user, visitId, now);
     });
@@ -128,7 +134,12 @@ export class VisitsService {
 
   extend(user: AuthUser, visitId: number, dto: ExtendVisitDto) {
     return this.run(async (tx, now) => {
-      const roomId = await visitRoomId(tx, user.organizationId, visitId);
+      const roomId = await visitRoomId(
+        tx,
+        user.organizationId,
+        requireBranchId(user),
+        visitId,
+      );
       await extendVisit(tx, { user, visitId, roomId, minutes: dto.minutes });
       return loadVisitDetail(tx, user, visitId, now);
     });
@@ -169,7 +180,12 @@ export class VisitsService {
 
   complete(user: AuthUser, visitId: number, dto: CompleteVisitDto) {
     return this.run(async (tx, now) => {
-      const roomId = await visitRoomId(tx, user.organizationId, visitId);
+      const roomId = await visitRoomId(
+        tx,
+        user.organizationId,
+        requireBranchId(user),
+        visitId,
+      );
       await completeVisit(tx, {
         user,
         visitId,
@@ -183,7 +199,12 @@ export class VisitsService {
 
   cancel(user: AuthUser, visitId: number, dto: CancelVisitDto) {
     return this.run(async (tx, now) => {
-      const roomId = await visitRoomId(tx, user.organizationId, visitId);
+      const roomId = await visitRoomId(
+        tx,
+        user.organizationId,
+        requireBranchId(user),
+        visitId,
+      );
       await cancelVisit(tx, {
         user,
         visitId,

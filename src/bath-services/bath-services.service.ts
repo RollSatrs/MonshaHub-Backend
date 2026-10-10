@@ -2,7 +2,7 @@ import { HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from 'src';
 import { servicesTable } from 'src/db/schema';
-import { canSeeInactive } from 'src/common/access';
+import { canSeeInactive, requireBranchId } from 'src/common/access';
 import { isForeignKeyViolation, uniqueViolation } from 'src/common/db-errors';
 import { ListQueryDto } from 'src/common/dto/list-query.dto';
 import { AppException } from 'src/common/errors/app.exception';
@@ -36,7 +36,11 @@ const toResponse = (
 @Injectable()
 export class BathServicesService {
   async list(user: AuthUser, query: ListQueryDto) {
-    const conditions = [eq(servicesTable.organizationId, user.organizationId)];
+    const branchId = requireBranchId(user);
+    const conditions = [
+      eq(servicesTable.organizationId, user.organizationId),
+      eq(servicesTable.branchId, branchId),
+    ];
     if (!canSeeInactive(user, query))
       conditions.push(eq(servicesTable.active, true));
     const rows = await db
@@ -48,6 +52,7 @@ export class BathServicesService {
   }
 
   async get(user: AuthUser, id: number) {
+    const branchId = requireBranchId(user);
     const [row] = await db
       .select()
       .from(servicesTable)
@@ -55,6 +60,7 @@ export class BathServicesService {
         and(
           eq(servicesTable.id, id),
           eq(servicesTable.organizationId, user.organizationId),
+          eq(servicesTable.branchId, branchId),
         ),
       )
       .limit(1);
@@ -63,11 +69,13 @@ export class BathServicesService {
   }
 
   async create(user: AuthUser, dto: CreateBathServiceDto) {
+    const branchId = requireBranchId(user);
     try {
       const [row] = await db
         .insert(servicesTable)
         .values({
           organizationId: user.organizationId,
+          branchId,
           name: dto.name.trim(),
           price: normalizeMoney(dto.price),
         })
@@ -80,6 +88,7 @@ export class BathServicesService {
   }
 
   async update(user: AuthUser, id: number, dto: UpdateBathServiceDto) {
+    const branchId = requireBranchId(user);
     const set: Partial<typeof servicesTable.$inferInsert> = {};
     if (dto.name !== undefined) set.name = dto.name.trim();
     if (dto.price !== undefined) set.price = normalizeMoney(dto.price);
@@ -94,6 +103,7 @@ export class BathServicesService {
           and(
             eq(servicesTable.id, id),
             eq(servicesTable.organizationId, user.organizationId),
+            eq(servicesTable.branchId, branchId),
           ),
         )
         .returning();
@@ -107,6 +117,7 @@ export class BathServicesService {
 
   /** Техническая операция: только для услуги, которая никогда не использовалась. Основной путь — архивация. */
   async remove(user: AuthUser, id: number) {
+    const branchId = requireBranchId(user);
     try {
       const deleted = await db
         .delete(servicesTable)
@@ -114,6 +125,7 @@ export class BathServicesService {
           and(
             eq(servicesTable.id, id),
             eq(servicesTable.organizationId, user.organizationId),
+            eq(servicesTable.branchId, branchId),
           ),
         )
         .returning({ id: servicesTable.id });

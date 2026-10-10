@@ -17,6 +17,8 @@ import { HealthController } from './health/health.controller';
 import { validateEnv } from './config/env.validation';
 import { JwtAuthGuard } from './auth/jwt.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { BranchesModule } from './branches/branches.module';
+import { WorkplacesModule } from './workplaces/workplaces.module';
 
 @Module({
   imports: [
@@ -42,6 +44,8 @@ import { RolesGuard } from './common/guards/roles.guard';
     BookingsModule,
     VisitsModule,
     LiveModule,
+    BranchesModule,
+    WorkplacesModule,
   ],
   controllers: [HealthController],
   providers: [

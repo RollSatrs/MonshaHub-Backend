@@ -2,7 +2,7 @@ import { HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from 'src';
 import { roomsTable, tariffsTable } from 'src/db/schema';
-import { canSeeInactive } from 'src/common/access';
+import { canSeeInactive, requireBranchId } from 'src/common/access';
 import { isForeignKeyViolation, uniqueViolation } from 'src/common/db-errors';
 import { ListQueryDto } from 'src/common/dto/list-query.dto';
 import { AppException } from 'src/common/errors/app.exception';
@@ -25,7 +25,11 @@ type RoomRow = typeof roomsTable.$inferSelect;
 @Injectable()
 export class RoomsService {
   async list(user: AuthUser, query: ListQueryDto): Promise<RoomResponseDto[]> {
-    const conditions = [eq(roomsTable.organizationId, user.organizationId)];
+    const branchId = requireBranchId(user);
+    const conditions = [
+      eq(roomsTable.organizationId, user.organizationId),
+      eq(roomsTable.branchId, branchId),
+    ];
     if (!canSeeInactive(user, query))
       conditions.push(eq(roomsTable.active, true));
 
@@ -38,6 +42,7 @@ export class RoomsService {
   }
 
   async get(user: AuthUser, id: number): Promise<RoomResponseDto> {
+    const branchId = requireBranchId(user);
     const [room] = await db
       .select()
       .from(roomsTable)
@@ -45,6 +50,7 @@ export class RoomsService {
         and(
           eq(roomsTable.id, id),
           eq(roomsTable.organizationId, user.organizationId),
+          eq(roomsTable.branchId, branchId),
         ),
       )
       .limit(1);
@@ -54,11 +60,13 @@ export class RoomsService {
   }
 
   async create(user: AuthUser, dto: CreateRoomDto): Promise<RoomResponseDto> {
+    const branchId = requireBranchId(user);
     try {
       const [room] = await db
         .insert(roomsTable)
         .values({
           organizationId: user.organizationId,
+          branchId,
           name: dto.name.trim(),
           type: dto.type,
           capacity: dto.capacity,
@@ -77,6 +85,7 @@ export class RoomsService {
     id: number,
     dto: UpdateRoomDto,
   ): Promise<RoomResponseDto> {
+    const branchId = requireBranchId(user);
     const set: Partial<typeof roomsTable.$inferInsert> = {};
     if (dto.name !== undefined) set.name = dto.name.trim();
     if (dto.capacity !== undefined) set.capacity = dto.capacity;
@@ -92,6 +101,7 @@ export class RoomsService {
           and(
             eq(roomsTable.id, id),
             eq(roomsTable.organizationId, user.organizationId),
+            eq(roomsTable.branchId, branchId),
           ),
         )
         .returning();
@@ -109,6 +119,7 @@ export class RoomsService {
    * ссылается история (Visit/Booking) — БД не даёт удалить, отвечаем ENTITY_IN_USE.
    */
   async remove(user: AuthUser, id: number) {
+    const branchId = requireBranchId(user);
     try {
       const deleted = await db
         .delete(roomsTable)
@@ -116,6 +127,7 @@ export class RoomsService {
           and(
             eq(roomsTable.id, id),
             eq(roomsTable.organizationId, user.organizationId),
+            eq(roomsTable.branchId, branchId),
           ),
         )
         .returning({ id: roomsTable.id });

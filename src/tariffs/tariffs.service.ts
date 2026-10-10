@@ -2,7 +2,7 @@ import { HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from 'src';
 import { roomsTable, tariffsTable } from 'src/db/schema';
-import { canSeeInactive } from 'src/common/access';
+import { canSeeInactive, requireBranchId } from 'src/common/access';
 import { isForeignKeyViolation, uniqueViolation } from 'src/common/db-errors';
 import { AppException } from 'src/common/errors/app.exception';
 import { ErrorCode } from 'src/common/errors/error-codes';
@@ -27,6 +27,7 @@ const alreadyExists = () =>
 @Injectable()
 export class TariffsService {
   async list(user: AuthUser, query: ListTariffsQueryDto) {
+    const branchId = requireBranchId(user);
     const conditions = [eq(tariffsTable.organizationId, user.organizationId)];
     if (!canSeeInactive(user, query))
       conditions.push(eq(tariffsTable.active, true));
@@ -35,12 +36,14 @@ export class TariffsService {
     const rows = await db
       .select()
       .from(tariffsTable)
-      .where(and(...conditions))
+      .innerJoin(roomsTable, eq(roomsTable.id, tariffsTable.roomId))
+      .where(and(...conditions, eq(roomsTable.branchId, branchId)))
       .orderBy(asc(tariffsTable.roomId), asc(tariffsTable.id));
-    return rows.map(toTariffResponse);
+    return rows.map((row) => toTariffResponse(row.tariffs));
   }
 
   async create(user: AuthUser, dto: CreateTariffDto) {
+    const branchId = requireBranchId(user);
     const [room] = await db
       .select()
       .from(roomsTable)
@@ -48,6 +51,7 @@ export class TariffsService {
         and(
           eq(roomsTable.id, dto.roomId),
           eq(roomsTable.organizationId, user.organizationId),
+          eq(roomsTable.branchId, branchId),
         ),
       )
       .limit(1);
@@ -90,6 +94,7 @@ export class TariffsService {
   }
 
   async update(user: AuthUser, id: number, dto: UpdateTariffDto) {
+    await this.getOne(user, id);
     const set: Partial<typeof tariffsTable.$inferInsert> = {};
     if (dto.name !== undefined) set.name = dto.name.trim();
     if (dto.price !== undefined) set.price = normalizeMoney(dto.price);
@@ -119,6 +124,7 @@ export class TariffsService {
 
   /** Техническая операция: только для тарифа, на который ничего не ссылается. Основной путь — архивация. */
   async remove(user: AuthUser, id: number) {
+    await this.getOne(user, id);
     try {
       const deleted = await db
         .delete(tariffsTable)
@@ -144,16 +150,18 @@ export class TariffsService {
 
   private async getOne(user: AuthUser, id: number) {
     const [row] = await db
-      .select()
+      .select({ tariff: tariffsTable })
       .from(tariffsTable)
+      .innerJoin(roomsTable, eq(roomsTable.id, tariffsTable.roomId))
       .where(
         and(
           eq(tariffsTable.id, id),
           eq(tariffsTable.organizationId, user.organizationId),
+          eq(roomsTable.branchId, requireBranchId(user)),
         ),
       )
       .limit(1);
     if (!row) throw notFound();
-    return toTariffResponse(row);
+    return toTariffResponse(row.tariff);
   }
 }

@@ -19,6 +19,7 @@ export type StockMovementType =
 
 export interface StockMovementInput {
   organizationId: number;
+  branchId: number;
   productId: number;
   type: StockMovementType;
   /** Знак должен соответствовать типу (RESTOCK/SALE_RETURN > 0; WRITE_OFF/SALE < 0; ADJUSTMENT любой ≠ 0) */
@@ -39,7 +40,7 @@ export async function applyStockMovement(
   tx: DbExecutor,
   input: StockMovementInput,
 ) {
-  const { organizationId, productId, quantityDelta } = input;
+  const { organizationId, branchId, productId, quantityDelta } = input;
 
   const [updated] = await tx
     .update(productsTable)
@@ -48,6 +49,7 @@ export async function applyStockMovement(
       and(
         eq(productsTable.id, productId),
         eq(productsTable.organizationId, organizationId),
+        eq(productsTable.branchId, branchId),
         sql`${productsTable.stock} + ${quantityDelta} >= 0`,
       ),
     )
@@ -61,6 +63,7 @@ export async function applyStockMovement(
         and(
           eq(productsTable.id, productId),
           eq(productsTable.organizationId, organizationId),
+          eq(productsTable.branchId, branchId),
         ),
       )
       .limit(1);
@@ -76,6 +79,7 @@ export async function applyStockMovement(
     .insert(stockMovementsTable)
     .values({
       organizationId,
+      branchId,
       productId,
       type: input.type,
       quantityDelta,

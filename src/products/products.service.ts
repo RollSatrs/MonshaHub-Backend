@@ -2,7 +2,7 @@ import { HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { db } from 'src';
 import { productsTable, stockMovementsTable, usersTable } from 'src/db/schema';
-import { canSeeInactive } from 'src/common/access';
+import { canSeeInactive, requireBranchId } from 'src/common/access';
 import { isForeignKeyViolation, uniqueViolation } from 'src/common/db-errors';
 import { ListQueryDto } from 'src/common/dto/list-query.dto';
 import { AppException } from 'src/common/errors/app.exception';
@@ -48,7 +48,11 @@ const validation = (message: string) =>
 @Injectable()
 export class ProductsService {
   async list(user: AuthUser, query: ListQueryDto) {
-    const conditions = [eq(productsTable.organizationId, user.organizationId)];
+    const branchId = requireBranchId(user);
+    const conditions = [
+      eq(productsTable.organizationId, user.organizationId),
+      eq(productsTable.branchId, branchId),
+    ];
     if (!canSeeInactive(user, query))
       conditions.push(eq(productsTable.active, true));
     const rows = await db
@@ -60,6 +64,7 @@ export class ProductsService {
   }
 
   async get(user: AuthUser, id: number) {
+    const branchId = requireBranchId(user);
     const [row] = await db
       .select()
       .from(productsTable)
@@ -67,6 +72,7 @@ export class ProductsService {
         and(
           eq(productsTable.id, id),
           eq(productsTable.organizationId, user.organizationId),
+          eq(productsTable.branchId, branchId),
         ),
       )
       .limit(1);
@@ -75,12 +81,14 @@ export class ProductsService {
   }
 
   async create(user: AuthUser, dto: CreateProductDto) {
+    const branchId = requireBranchId(user);
     try {
       return await db.transaction(async (tx) => {
         const [product] = await tx
           .insert(productsTable)
           .values({
             organizationId: user.organizationId,
+            branchId,
             name: dto.name.trim(),
             price: normalizeMoney(dto.price),
             stock: 0,
@@ -92,6 +100,7 @@ export class ProductsService {
           // начальный остаток — тоже движение, чтобы журнал не начинался с «необъяснимого» числа
           const { stock } = await applyStockMovement(tx, {
             organizationId: user.organizationId,
+            branchId,
             productId: product.id,
             type: 'RESTOCK',
             quantityDelta: initial,
@@ -109,6 +118,7 @@ export class ProductsService {
   }
 
   async update(user: AuthUser, id: number, dto: UpdateProductDto) {
+    const branchId = requireBranchId(user);
     const set: Partial<typeof productsTable.$inferInsert> = {};
     if (dto.name !== undefined) set.name = dto.name.trim();
     if (dto.price !== undefined) set.price = normalizeMoney(dto.price);
@@ -123,6 +133,7 @@ export class ProductsService {
           and(
             eq(productsTable.id, id),
             eq(productsTable.organizationId, user.organizationId),
+            eq(productsTable.branchId, branchId),
           ),
         )
         .returning();
@@ -139,6 +150,7 @@ export class ProductsService {
    * Товар с остатком/историей нужно архивировать (PATCH active=false).
    */
   async remove(user: AuthUser, id: number) {
+    const branchId = requireBranchId(user);
     try {
       const deleted = await db
         .delete(productsTable)
@@ -146,6 +158,7 @@ export class ProductsService {
           and(
             eq(productsTable.id, id),
             eq(productsTable.organizationId, user.organizationId),
+            eq(productsTable.branchId, branchId),
           ),
         )
         .returning({ id: productsTable.id });
@@ -164,6 +177,7 @@ export class ProductsService {
 
   /** Ручное движение остатка (RESTOCK / WRITE_OFF / ADJUSTMENT): изменение остатка и запись журнала — одна транзакция. */
   async addMovement(user: AuthUser, id: number, dto: CreateStockMovementDto) {
+    const branchId = requireBranchId(user);
     const delta = dto.quantityDelta;
     if (delta === 0) throw validation('quantityDelta не может быть 0');
     if (dto.type === 'RESTOCK' && delta < 0)
@@ -177,6 +191,7 @@ export class ProductsService {
     return db.transaction(async (tx) => {
       const { movement } = await applyStockMovement(tx, {
         organizationId: user.organizationId,
+        branchId,
         productId: id,
         type: dto.type,
         quantityDelta: delta,
@@ -211,6 +226,7 @@ export class ProductsService {
   }
 
   async listMovements(user: AuthUser, id: number, limit = 50) {
+    const branchId = requireBranchId(user);
     const [product] = await db
       .select({ id: productsTable.id })
       .from(productsTable)
@@ -218,6 +234,7 @@ export class ProductsService {
         and(
           eq(productsTable.id, id),
           eq(productsTable.organizationId, user.organizationId),
+          eq(productsTable.branchId, branchId),
         ),
       )
       .limit(1);
@@ -234,6 +251,7 @@ export class ProductsService {
         and(
           eq(stockMovementsTable.productId, id),
           eq(stockMovementsTable.organizationId, user.organizationId),
+          eq(stockMovementsTable.branchId, branchId),
         ),
       )
       .orderBy(

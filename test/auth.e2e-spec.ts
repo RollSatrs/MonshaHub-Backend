@@ -13,6 +13,7 @@ import {
   sentResetTokens,
   uniqueEmail,
 } from './helpers';
+import { hashFunction } from '../shared/tools/tools';
 
 describe('Auth (e2e)', () => {
   let app: INestApplication;
@@ -133,6 +134,33 @@ describe('Auth (e2e)', () => {
         (c) => c.startsWith(`${AUTH_COOKIE}=`) && /HttpOnly/i.test(c),
       ),
     ).toBe(true);
+  });
+
+  it('pin-login принимает email и четырёхзначный PIN', async () => {
+    const owner = await registerOwner(app);
+    await db
+      .update(usersTable)
+      .set({ pinHash: await hashFunction('1234') })
+      .where(eq(usersTable.email, owner.email));
+
+    const res = await http()
+      .post('/auth/pin-login')
+      .send({ email: owner.email, pin: '1234' })
+      .expect(200);
+    const cookies = res.headers['set-cookie'] as unknown as string[];
+    expect(cookies.some((cookie) => /HttpOnly/i.test(cookie))).toBe(true);
+
+    await http()
+      .post('/auth/pin-login')
+      .send({ email: owner.email, pin: '9999' })
+      .expect(401);
+  });
+
+  it('pin-login отклоняет PIN не из четырёх цифр', async () => {
+    await http()
+      .post('/auth/pin-login')
+      .send({ email: uniqueEmail('pin'), pin: '12ab' })
+      .expect(400);
   });
 
   it('logout работает без сессии и с недействительным токеном (можно выйти из «застрявшей» сессии) и очищает cookie', async () => {

@@ -31,6 +31,7 @@ const baseUser = {
   fullname: 'Test User',
   email: 'user@test.com',
   passwordHash: 'hashed:correct-password',
+  pinHash: 'hashed:1234',
   role: 'OWNER',
   avatar: null,
   active: true,
@@ -88,6 +89,32 @@ describe('AuthService', () => {
         role: 'OWNER',
         organizationId: 7,
       });
+    });
+  });
+
+  describe('loginWithPin', () => {
+    it('возвращает сессию при правильном PIN', async () => {
+      selectMock.limit.mockResolvedValueOnce([baseUser]);
+      const result = await service.loginWithPin({
+        email: 'user@test.com',
+        pin: '1234',
+      });
+
+      expect(result.token).toBe('signed.jwt.token');
+      expect(result.user).toMatchObject({ id: 1, email: 'user@test.com' });
+    });
+
+    it('не позволяет войти без PIN или с неверным PIN', async () => {
+      selectMock.limit
+        .mockResolvedValueOnce([{ ...baseUser, pinHash: null }])
+        .mockResolvedValueOnce([baseUser]);
+
+      await expect(
+        service.loginWithPin({ email: 'user@test.com', pin: '1234' }),
+      ).rejects.toMatchObject({ code: ErrorCode.INVALID_CREDENTIALS });
+      await expect(
+        service.loginWithPin({ email: 'user@test.com', pin: '9999' }),
+      ).rejects.toMatchObject({ code: ErrorCode.INVALID_CREDENTIALS });
     });
   });
 

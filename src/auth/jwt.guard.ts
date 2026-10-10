@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   CanActivate,
   ExecutionContext,
   Injectable,
@@ -6,10 +7,10 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
-import { eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { Request } from 'express';
 import { db } from 'src';
-import { usersTable } from 'src/db/schema';
+import { branchesTable, usersTable } from 'src/db/schema';
 import type { AuthUser } from 'src/types/express';
 import { AUTH_COOKIE } from 'shared/constants/auth';
 import { IS_PUBLIC_KEY } from 'src/common/decorators/auth.decorators';
@@ -52,6 +53,7 @@ export class JwtAuthGuard implements CanActivate {
         email: usersTable.email,
         role: usersTable.role,
         organizationId: usersTable.organizationId,
+        branchId: usersTable.branchId,
         active: usersTable.active,
       })
       .from(usersTable)
@@ -61,11 +63,64 @@ export class JwtAuthGuard implements CanActivate {
       throw new UnauthorizedException('Пользователь недоступен');
     }
 
+    let branchId = user.branchId;
+    if (user.role === 'OWNER') {
+      const rawBranchId = req.header('x-branch-id');
+      const requestedBranchId = rawBranchId ? Number(rawBranchId) : undefined;
+      if (
+        rawBranchId &&
+        (!Number.isInteger(requestedBranchId) || requestedBranchId! < 1)
+      ) {
+        throw new BadRequestException('Некорректный филиал');
+      }
+      const conditions = [
+        eq(branchesTable.organizationId, user.organizationId),
+        eq(branchesTable.active, true),
+      ];
+      if (requestedBranchId) {
+        conditions.push(eq(branchesTable.id, requestedBranchId));
+      }
+      let [branch] = await db
+        .select({ id: branchesTable.id })
+        .from(branchesTable)
+        .where(and(...conditions))
+        .orderBy(asc(branchesTable.id))
+        .limit(1);
+      if (!branch && requestedBranchId) {
+        [branch] = await db
+          .select({ id: branchesTable.id })
+          .from(branchesTable)
+          .where(
+            and(
+              eq(branchesTable.organizationId, user.organizationId),
+              eq(branchesTable.active, true),
+            ),
+          )
+          .orderBy(asc(branchesTable.id))
+          .limit(1);
+      }
+      branchId = branch?.id ?? null;
+    } else if (branchId) {
+      const [branch] = await db
+        .select({ id: branchesTable.id })
+        .from(branchesTable)
+        .where(
+          and(
+            eq(branchesTable.id, branchId),
+            eq(branchesTable.organizationId, user.organizationId),
+            eq(branchesTable.active, true),
+          ),
+        )
+        .limit(1);
+      if (!branch) throw new UnauthorizedException('Филиал недоступен');
+    }
+
     req.user = {
       id: user.id,
       email: user.email,
       role: user.role,
       organizationId: user.organizationId,
+      branchId,
     };
     return true;
   }

@@ -5,6 +5,7 @@ export interface AuthUser {
   email: string;
   role: Role;
   organizationId: number;
+  branchId: number | null;
 }
 
 declare global {

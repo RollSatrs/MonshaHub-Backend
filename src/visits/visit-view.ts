@@ -16,6 +16,7 @@ import {
   VisitListDto,
 } from './dto/visit.dto';
 import { Tx, visitTotals } from './visit-ops';
+import { requireBranchId } from 'src/common/access';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -58,6 +59,7 @@ export async function loadVisitDetail(
       and(
         eq(visitsTable.id, visitId),
         eq(visitsTable.organizationId, user.organizationId),
+        eq(visitsTable.branchId, requireBranchId(user)),
       ),
     )
     .limit(1);
@@ -162,7 +164,10 @@ export async function listVisits(
   const limit = query.limit ?? 50;
   const closedAt = sql`coalesce(${visitsTable.endedAt}, ${visitsTable.cancelledAt}, ${visitsTable.startedAt})`;
 
-  const conditions = [eq(visitsTable.organizationId, user.organizationId)];
+  const conditions = [
+    eq(visitsTable.organizationId, user.organizationId),
+    eq(visitsTable.branchId, requireBranchId(user)),
+  ];
   if (query.status) {
     conditions.push(eq(visitsTable.status, query.status));
   } else {

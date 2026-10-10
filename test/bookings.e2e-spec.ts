@@ -252,10 +252,16 @@ describe('Booking (e2e)', () => {
     it('DB-защита: exclusion constraint не даёт создать пересекающуюся бронь в обход сервиса', async () => {
       const room = await mkPrivateRoom(owner.agent);
       const a = await mustBook(cashier.agent, room.id, 60, 120);
+      const branchId = (
+        (await owner.agent.get('/branches').expect(200)).body as {
+          id: number;
+        }[]
+      )[0].id;
       const failure: unknown = await db
         .insert(bookingsTable)
         .values({
           organizationId: owner.organizationId,
+          branchId,
           roomId: room.id,
           customerName: 'Обход',
           customerPhone: '+7 700 000 00 00',

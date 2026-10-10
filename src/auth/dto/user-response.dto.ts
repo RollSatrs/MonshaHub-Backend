@@ -10,6 +10,9 @@ export class UserResponseDto {
   @ApiProperty({ example: 1 })
   organizationId: number;
 
+  @ApiProperty({ type: Number, nullable: true })
+  branchId: number | null;
+
   @ApiProperty({ example: 'Иван Иванов' })
   fullname: string;
 
@@ -39,6 +42,7 @@ export class MessageResponseDto {
 export function toUserResponse(u: {
   id: number;
   organizationId: number;
+  branchId?: number | null;
   fullname: string;
   email: string;
   role: Role;
@@ -47,6 +51,7 @@ export function toUserResponse(u: {
   return {
     id: u.id,
     organizationId: u.organizationId,
+    branchId: u.branchId ?? null,
     fullname: u.fullname,
     email: u.email,
     role: u.role,

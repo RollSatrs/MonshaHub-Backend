@@ -1,12 +1,14 @@
 import {
+  BadRequestException,
   ForbiddenException,
   HttpStatus,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { randomBytes } from 'node:crypto';
+import { and, asc, eq } from 'drizzle-orm';
 import { db } from 'src';
-import { usersTable } from 'src/db/schema';
+import { branchesTable, usersTable } from 'src/db/schema';
 import { hashFunction } from 'shared/tools/tools';
 import { AppException } from 'src/common/errors/app.exception';
 import { ErrorCode } from 'src/common/errors/error-codes';
@@ -42,15 +44,23 @@ export class StaffService {
       .where(eq(usersTable.email, email))
       .limit(1);
     if (existing) throw this.emailTaken();
+    const branchId = dto.branchId ?? (await this.defaultBranch(organizationId));
+    await this.ensureBranch(organizationId, branchId);
 
     try {
       const [created] = await db
         .insert(usersTable)
         .values({
           organizationId,
+          branchId,
           fullname: dto.fullname.trim(),
           email,
-          passwordHash: await hashFunction(dto.password),
+          // Новые кассиры входят по PIN. Случайный пароль сохраняет
+          // совместимость с общей схемой пользователей, но никому не выдаётся.
+          passwordHash: await hashFunction(
+            dto.password ?? randomBytes(32).toString('base64url'),
+          ),
+          pinHash: dto.pin ? await hashFunction(dto.pin) : null,
           role: 'CASHIER',
         })
         .returning();
@@ -88,12 +98,55 @@ export class StaffService {
       throw new ForbiddenException('Можно изменять только кассиров');
     }
 
+    if (dto.branchId !== undefined) {
+      await this.ensureBranch(actor.organizationId, dto.branchId);
+    }
+
+    const set: Partial<typeof usersTable.$inferInsert> = {};
+    if (dto.active !== undefined) set.active = dto.active;
+    if (dto.branchId !== undefined) set.branchId = dto.branchId;
+    if (dto.pin !== undefined) set.pinHash = await hashFunction(dto.pin);
+    if (!Object.keys(set).length) {
+      throw new BadRequestException('Укажите изменения сотрудника');
+    }
+
     const [updated] = await db
       .update(usersTable)
-      .set({ active: dto.active })
+      .set(set)
       .where(eq(usersTable.id, target.id))
       .returning();
     return toMember(updated);
+  }
+
+  private async ensureBranch(organizationId: number, branchId: number) {
+    const [branch] = await db
+      .select({ id: branchesTable.id })
+      .from(branchesTable)
+      .where(
+        and(
+          eq(branchesTable.id, branchId),
+          eq(branchesTable.organizationId, organizationId),
+          eq(branchesTable.active, true),
+        ),
+      )
+      .limit(1);
+    if (!branch) throw new NotFoundException('Филиал не найден');
+  }
+
+  private async defaultBranch(organizationId: number) {
+    const [branch] = await db
+      .select({ id: branchesTable.id })
+      .from(branchesTable)
+      .where(
+        and(
+          eq(branchesTable.organizationId, organizationId),
+          eq(branchesTable.active, true),
+        ),
+      )
+      .orderBy(asc(branchesTable.id))
+      .limit(1);
+    if (!branch) throw new NotFoundException('Активный филиал не найден');
+    return branch.id;
   }
 
   private emailTaken() {
